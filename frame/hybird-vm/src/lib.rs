@@ -32,7 +32,7 @@ use sp_core::crypto::UncheckedFrom;
 use pallet_contracts::chain_extension::{
 	Environment, Ext, InitState, RetVal, SysConfig, 
 };
-
+use pallet_contracts::{DebugInfo, CollectEvents, Determinism};
 use sp_runtime::app_crypto::sp_core::{H160, U256};
 use sp_runtime::DispatchError;
 
@@ -185,8 +185,12 @@ pub mod pallet {
 					origin,
 					target,
 					0.into(),
-					gas_limit,
-					input
+					gas_limit.into(),
+					None,
+					input,
+					DebugInfo::Skip,
+					CollectEvents::Skip,
+					Determinism::Enforced
 				);
 			let output: ResultBox<Vec<u8>>;
 			match info.exec_result {
