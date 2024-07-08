@@ -85,7 +85,8 @@ pub mod pallet {
 	pub trait Config: frame_system::Config +pallet_contracts::Config + pallet_evm::Config
 		where
 		<Self as frame_system::Config>::AccountId: UncheckedFrom<Self::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<Self as pallet_contracts::Config>::Currency as Currency<<Self as frame_system::Config>::AccountId>>::Balance: From<u128>, <Self as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<Self as frame_system::Config>::AccountId>
+		<<Self as pallet_contracts::Config>::Currency as Currency<<Self as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+		<Self as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<Self as frame_system::Config>::AccountId>
 	{
 
 
@@ -109,7 +110,8 @@ pub mod pallet {
 	pub enum Event<T: Config> 
 	where 
 		T::AccountId: UncheckedFrom<T::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, <T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
+		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+		<T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
 	{
 		EVMExecuted(H160),
 		WasmCExecuted(T::AccountId),
@@ -126,7 +128,8 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T>
 	where
 		T::AccountId: UncheckedFrom<T::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, <T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
+		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+		<T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
 	{
 	}
 
@@ -135,7 +138,8 @@ pub mod pallet {
 	impl<T: Config> Pallet<T>
 	where
 		T::AccountId: UncheckedFrom<T::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, <T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
+		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+		<T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
 	{
 			
 		#[pallet::weight(0)]
@@ -152,14 +156,14 @@ pub mod pallet {
 	impl<T: Config> Pallet<T>
 	where
 		T::AccountId: UncheckedFrom<T::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, <T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
-	{
-				
+		<T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>,
+		<<T as pallet_contracts::Config>::Currency as Currency<<T as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+	{	
 		pub fn call_wasm4evm(
 			origin: OriginFor<T>,
 			data: Vec<u8>,
-			target_gas: Option<u64>
-		) -> Result<(Vec<u8>, u64)> {
+			target_gas: Option<Weight>
+		) -> Result<(Vec<u8>, Weight)> {
 			if !T::Enable2WasmC::get() {
 				return Err(DispatchError::from("Enable2WasmC is false, can't call wasm contract."));
 			}
@@ -172,7 +176,7 @@ pub mod pallet {
 				Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
 			}
 					
-			let mut gas_limit:u64 = 0;
+			let mut gas_limit: Weight = Weight::zero();
 			match target_gas {
 				Some(t) =>  gas_limit = t,
 				None => (),
@@ -184,8 +188,8 @@ pub mod pallet {
 			let info = pallet_contracts::Pallet::<T>::bare_call(
 					origin,
 					target,
-					0.into(),
-					gas_limit.into(),
+					0u8.into(),
+					gas_limit,
 					None,
 					input,
 					DebugInfo::Skip,
@@ -193,15 +197,15 @@ pub mod pallet {
 					Determinism::Enforced
 				);
 			let output: ResultBox<Vec<u8>>;
-			match info.exec_result {
+			match info.result {
 				Ok(return_value) => {
-					if return_value.is_success() {
+					if !return_value.did_revert() {
 						output = vm_codec::wasm_decode(&data[32..].iter().cloned().collect(), &return_value.data, true, "");
 					} else {
 						return Err(DispatchError::from("Call wasm contract failed(REVERT)"));
 					}
 				},
-				Err(e) => return Err(e.error),
+				Err(e) => return Err(e),
 			}
 			
 			match output {
@@ -216,7 +220,8 @@ pub mod pallet {
 	impl<C: Config> Pallet<C>
 	where
 		C::AccountId: UncheckedFrom<C::Hash> + AsRef<[u8]> + From<AccountId32>,
-		<<C as pallet_contracts::Config>::Currency as Currency<<C as frame_system::Config>::AccountId>>::Balance: From<u128>, <C as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<C as frame_system::Config>::AccountId>
+		<<C as pallet_contracts::Config>::Currency as Currency<<C as frame_system::Config>::AccountId>>::Balance: From<u128>, 
+		<C as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<C as frame_system::Config>::AccountId>
 	{
 		pub fn  call_evm4wasm<E>(mut env: Environment<E, InitState>)-> Result<RetVal>
 		where
