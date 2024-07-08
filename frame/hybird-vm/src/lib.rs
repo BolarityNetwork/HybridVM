@@ -233,11 +233,12 @@ pub mod pallet {
 			}
 			
 			let mut source_arr = [0u8; 32];
-			source_arr[0..32].copy_from_slice(env.ext().caller().as_byte_slice());
+			let caller_accountid = env.ext().caller().account_id()?;
+			source_arr[0..32].copy_from_slice(caller_accountid.as_byte_slice());
 			let source = H160::from_slice(&source_arr[0..20]);
 			
 			let mut envbuf = env.buf_in_buf_out();
-			let input0:Vec<u8> = envbuf.read_as()?;
+			let input0:Vec<u8> = envbuf.read_as_unbounded(1_000_000)?;
 			
 			let input: Vec<u8>;
 			let target: H160;
@@ -256,7 +257,7 @@ pub mod pallet {
 				U256::default(), 
 				100_000_000_000,  
 				Some(U256::default()),
-				Some(pallet_evm::Module::<C>::account_basic(&source).nonce),
+				Some(pallet_evm::Module::<C>::account_basic(&source).0.nonce),
 				C::config()
 			);
 			
