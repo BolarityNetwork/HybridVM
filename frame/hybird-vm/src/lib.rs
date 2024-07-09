@@ -142,15 +142,6 @@ pub mod pallet {
 		<T as pallet_contracts::Config>::Currency: frame_support::traits::Currency<<T as frame_system::Config>::AccountId>
 	{
 			
-		#[pallet::weight(0)]
-		pub fn call(
-			_origin: OriginFor<T>,
-			_data: Vec<u8>,
-			_target_gas: Option<u64>
-		) -> DispatchResult{
-			
-			Ok(())
-		}
 	}
 
 	impl<T: Config> Pallet<T>
@@ -259,7 +250,7 @@ pub mod pallet {
 				100_000_000_000,
 				Some(U256::default()),
 				None,
-				Some(pallet_evm::Module::<C>::account_basic(&source).0.nonce),
+				Some(pallet_evm::Pallet::<C>::account_basic(&source).0.nonce),
 				Vec::new(),
 				true,
 				true,
