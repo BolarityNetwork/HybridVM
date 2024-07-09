@@ -15,14 +15,12 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate alloc;
-
-use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
-use fp_evm::{ExitError, ExitRevert, ExitSucceed, Precompile, PrecompileFailure};
+use fp_evm::{ExitError, ExitSucceed, Precompile, PrecompileFailure};
 use fp_evm::{PrecompileHandle, PrecompileOutput, PrecompileResult};
 use pallet_evm::AddressMapping;
-use precompile_utils::prelude::*;
+use frame_system::RawOrigin;
+use hp_system::EvmHybirdVMExtension;
 
 pub struct CallHybirdVM<T> {
 	_marker: PhantomData<T>,
@@ -36,11 +34,12 @@ impl<T> Precompile for CallHybirdVM<T> where
 		let target_gas = handle.gas_limit();
 		let origin = RawOrigin::from(Some(T::AddressMapping::into_account_id(context.caller)));
 		
-		match T::call_hybird_vm(origin.into(), handle.input(), target_gas) {
-			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, cost:ret.1, output:ret.0, logs:Vec::new()}),
+		match T::call_hybird_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
+			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, output:ret.0}),
 			Err(e) => {
-				let errstr:&'static str = e.into();
-				Err(ExitError::Other(errstr.into()))	 
+				let err_str:&'static str = e.into();
+				
+				Err(PrecompileFailure::Error {exit_status: ExitError::Other(err_str.into()),}) 
 			},
 		}				
 	}
