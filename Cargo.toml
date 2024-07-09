@@ -15,6 +15,7 @@ overflow-checks = true
 
 [workspace]
 members = [
+    "primitives/system",
 	"frame/hybird-vm",
 	"frame/evm-precompile/call-hybird-vm",
 ]

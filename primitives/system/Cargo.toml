@@ -20,7 +20,7 @@ frame-system = { workspace = true, default-features = false}
 [features]
 default = [ "std" ]
 std = [
-	"sp-api/std",
+	"sp-std/std",
 	"sp-runtime/std",
 	"frame-system/std",
 ]

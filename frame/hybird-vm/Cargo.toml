@@ -51,7 +51,7 @@ pallet-evm-precompile-simple = { workspace = true, default-features = false}
 
 ink_env = { workspace = true }
 
-pallet-evm-precompile-call-vm = { version = "0.2.0", path = "../evm-precompile/call-vm" }
+pallet-evm-precompile-call-hybird-vm = { version = "0.1.0", path = "../evm-precompile/call-hybird-vm" }
 
 
 [features]

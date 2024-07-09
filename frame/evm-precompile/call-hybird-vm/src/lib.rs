@@ -28,8 +28,20 @@ pub struct CallHybirdVM<T> {
 	_marker: PhantomData<T>,
 }
 
-impl<T: pallet_evm::Config> Precompile for CallHybirdVM<T>
+impl<T> Precompile for CallHybirdVM<T> where
+	T: pallet_evm::Config + EvmHybirdVMExtension<T>,
 {
 	fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
+		let context = handle.context();
+		let target_gas = handle.gas_limit();
+		let origin = RawOrigin::from(Some(T::AddressMapping::into_account_id(context.caller)));
+		
+		match T::call_hybird_vm(origin.into(), handle.input(), target_gas) {
+			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, cost:ret.1, output:ret.0, logs:Vec::new()}),
+			Err(e) => {
+				let errstr:&'static str = e.into();
+				Err(ExitError::Other(errstr.into()))	 
+			},
+		}				
 	}
 }
