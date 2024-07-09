@@ -15,21 +15,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-extern crate alloc;
+use sp_std::vec::Vec;
+use frame_system::pallet_prelude::*;
 
-use alloc::{vec, vec::Vec};
-use core::marker::PhantomData;
-use fp_evm::{ExitError, ExitRevert, ExitSucceed, Precompile, PrecompileFailure};
-use fp_evm::{PrecompileHandle, PrecompileOutput, PrecompileResult};
-use pallet_evm::AddressMapping;
-use precompile_utils::prelude::*;
-
-pub struct CallHybirdVM<T> {
-	_marker: PhantomData<T>,
-}
-
-impl<T: pallet_evm::Config> Precompile for CallHybirdVM<T>
-{
-	fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
-	}
+pub trait EvmHybirdExtension<C: frame_system::Config> {
+	fn call_hybird_vm(
+			origin: OriginFor<C>,
+			data: Vec<u8>,
+			target_gas: Option<u64>
+		) -> Result<(Vec<u8>, u64),sp_runtime::DispatchError>;
 }
