@@ -12,6 +12,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 blake2-rfc = { workspace = true, default-features = false }
 byte-slice-cast= { workspace = true, default-features = false }
 codec = { workspace = true, features = ["derive"], default-features = false }
+ethereum = { workspace = true, features = ["with-codec"] }
 getrandom = { workspace = true, features = ["js"] }
 hex = { workspace = true, default-features = false, features = ['alloc'] }
 lite-json = { workspace = true, default-features = false }
@@ -58,6 +59,7 @@ pallet-evm-precompile-call-hybird-vm = { version = "0.1.0", path = "../evm-preco
 default = ["std"]
 std = [
 	"codec/std",
+	"ethereum/std",
 	"frame-support/std",
 	"frame-system/std",
 	"serde/std",
