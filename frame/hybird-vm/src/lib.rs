@@ -39,7 +39,7 @@ use sp_runtime::DispatchError;
 use serde::{Deserialize, Serialize};
 
 use pallet_evm::Runner;
-use fp_evm::ExecutionInfo;
+use fp_evm::ExecutionInfoV2;
 use frame_support::sp_runtime::AccountId32;
 use byte_slice_cast::AsByteSlice;
 
@@ -233,7 +233,8 @@ pub mod pallet {
 			}
 			
 			let mut source_arr = [0u8; 32];
-			let caller_accountid = env.ext().caller().account_id()?;
+			let caller = env.ext().caller();
+			let caller_accountid = caller.account_id()?;
 			source_arr[0..32].copy_from_slice(caller_accountid.as_byte_slice());
 			let source = H160::from_slice(&source_arr[0..20]);
 			
@@ -251,13 +252,19 @@ pub mod pallet {
 			}
 					
 			let info = <C as pallet_evm::Config>::Runner::call(
-				source, 
-				target, 
-				input, 
-				U256::default(), 
-				100_000_000_000,  
+				source,
+				target,
+				input,
+				U256::default(),
+				100_000_000_000,
 				Some(U256::default()),
+				None,
 				Some(pallet_evm::Module::<C>::account_basic(&source).0.nonce),
+				Vec::new(),
+				true,
+				true,
+				None,
+				None,
 				C::config()
 			);
 			
@@ -266,7 +273,7 @@ pub mod pallet {
 				Ok(r) => {
 				
 					match r {
-						ExecutionInfo { 	
+						ExecutionInfoV2 { 	
 							exit_reason:success,
 							value: v1,
 							..
@@ -281,7 +288,7 @@ pub mod pallet {
 					}
 				},
 				Err(e) => {
-					return Err(e.into());
+					return Err(DispatchError::from(e.error.into()));
 				},
 			}
 			
