@@ -52,6 +52,14 @@ type ResultBox<T> = sp_std::result::Result<T, CustomError>;
 #[cfg(test)]
 mod tests;
 
+pub trait EvmChainExtension<C: frame_system::Config> {
+	fn call_vm4evm(
+			origin: OriginFor<C>,
+			data: Vec<u8>,
+			target_gas: Option<u64>
+		) -> Result<(Vec<u8>, u64),sp_runtime::DispatchError>;
+}
+
 #[derive(Deserialize, Encode, Decode, Debug)]
 #[allow(non_snake_case)]
 struct CallVM  {

@@ -16,7 +16,7 @@ overflow-checks = true
 [workspace]
 members = [
 	"frame/hybird-vm",
-	"frame/evm-precompile/call-vm",
+	"frame/evm-precompile/call-hybird-vm",
 ]
 resolver = "2"
 
