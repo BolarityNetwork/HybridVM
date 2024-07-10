@@ -19,6 +19,11 @@
 
 // Modified by Alex Wang
 
+use super::*;
+
+use crate::mock::*;
+use frame_support::{assert_noop, assert_ok};
+
 use crate::{U256, H160, };
 
 use pallet_contracts::{
@@ -56,8 +61,7 @@ use frame_system::pallet_prelude::*;
 use std::error::Error;
 use serde::{Deserialize, Serialize};
 
-// use crate as gvm_bridge pallet
-use crate as pallet_vm_bridge;
+use crate as pallet_hybird_vm;
 
 #[derive(Deserialize, Encode, Decode, Serialize, Debug)]
 #[allow(non_snake_case)]
@@ -70,255 +74,8 @@ struct CallReturn  {
 type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
 type Block = frame_system::mocking::MockBlock<Test>;
 
-frame_support::construct_runtime!(
-	pub enum Test where
-		Block = Block,
-		NodeBlock = Block,
-		UncheckedExtrinsic = UncheckedExtrinsic,
-	{
-		System: frame_system::{Module, Call, Config, Storage, Event<T>},	
-		Balances: pallet_balances::{Module, Call, Storage, Config<T>, Event<T>},
-		Timestamp: pallet_timestamp::{Module, Call, Storage, Inherent},
-		Randomness: pallet_insecure_randomness_collective_flip::{Module, Call, Storage},	
-		Contracts: pallet_contracts::{Module, Call, Config<T>, Storage, Event<T>},
-		EVM: pallet_evm::{Module, Call, Config, Storage, Event<T>},
-		GvmBridge: pallet_vm_bridge::{Module, Call, Storage, Event<T>},
-	}
-);
-
-impl pallet_insecure_randomness_collective_flip::Config for Test {}
-
-parameter_types! {
-	pub const Enable2EVM: bool = true;
-	pub const Enable2WasmC: bool = true;
-}
-
-impl pallet_vm_bridge::Config for Test {
-	type Currency = Balances;
-	type Call = Call;
-	type Event = Event;
-	type Enable2EVM = Enable2EVM;
-	type Enable2WasmC = Enable2WasmC;
-}
-
-/// Identity address mapping.
-pub struct CompactAddressMapping;
-
-impl AddressMapping<AccountId32> for CompactAddressMapping {
-	fn into_account_id(address: H160) ->  AccountId32 {	
-		let mut data = [0u8; 32];
-		data[0..20].copy_from_slice(&address[..]);
-		AccountId32::from(data)
-	}
-}
-
-
-/// Fixed gas price of `0`.
-pub struct FixedGasPrice;
-impl FeeCalculator for FixedGasPrice {
-        fn min_gas_price() -> U256 {
-                0.into()
-        }
-}
-
-impl pallet_evm_precompile_call_vm::EvmChainExtension<Test> for Test{
-	fn call_vm4evm(
-		origin: OriginFor<Test>,
-		data: Vec<u8>,
-		target_gas: Option<u64>
-		) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>
-	{
-		GvmBridge::call_wasm4evm(origin, data, target_gas)
-	}
-}
-
-parameter_types! {
-        pub const ChainId: u64 = 42;
-}
-
-impl pallet_evm::Config for Test {
-        type FeeCalculator = FixedGasPrice;
-        type GasWeightMapping = ();
-        type CallOrigin = EnsureAddressTruncated;
-        type WithdrawOrigin = EnsureAddressTruncated;
-        type AddressMapping = CompactAddressMapping;
-        type Currency = Balances;
-        type Event = Event;
-        type Runner = pallet_evm::runner::stack::Runner<Self>;
-        type Precompiles = (
-                pallet_evm_precompile_simple::ECRecover,
-                pallet_evm_precompile_simple::Sha256,
-                pallet_evm_precompile_simple::Ripemd160,
-                pallet_evm_precompile_simple::Identity,
-				pallet_evm_precompile_call_vm::CallVm<Self>,
-        );
-        type ChainId = ChainId;
-        type OnChargeTransaction = ();
-		type BlockGasLimit = ();
-		type BlockHashMapping = SubstrateBlockHashMapping<Self>;
-}
-
-//E
-
-
-
-impl pallet_contracts::chain_extension::ChainExtension<Test> for Test{
-    fn call<E>(func_id: u32, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
-	where
-		E: Ext<T = Test>,
-		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>
-	{
-		match func_id {
-			5 => GvmBridge::call_evm4wasm::<E>(env),
-			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),			
-		}
-	}
-}
-
-parameter_types! {
-	pub const BlockHashCount: u64 = 250;
-	pub BlockWeights: frame_system::limits::BlockWeights =
-		frame_system::limits::BlockWeights::simple_max(2 * WEIGHT_PER_SECOND);
-	pub static ExistentialDeposit: u64 = 0;
-}
-
-impl frame_system::Config for Test {
-	type BaseCallFilter = ();
-	type BlockWeights = BlockWeights;
-	type BlockLength = ();
-	type DbWeight = ();
-	type Origin = Origin;
-	type Index = u64;
-	type BlockNumber = u64;
-	type Hash = H256;
-	type Call = Call;
-	type Hashing = BlakeTwo256;
-	type AccountId = AccountId32;
-	type Lookup = IdentityLookup<Self::AccountId>;
-	type Header = Header;
-	type Event = Event;
-	type BlockHashCount = BlockHashCount;
-	type Version = ();
-	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u128>;
-	type OnNewAccount = ();
-	type OnKilledAccount = ();
-	type SystemWeightInfo = ();
-	type SS58Prefix = ();
-}
-
-impl pallet_balances::Config for Test {
-	type MaxLocks = ();
-	type Balance = u128;
-	type Event = Event;
-	type DustRemoval = ();
-	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
-	type WeightInfo = ();
-}
-parameter_types! {
-	pub const MinimumPeriod: u64 = 1;
-}
-impl pallet_timestamp::Config for Test {
-	type Moment = u64;
-	type OnTimestampSet = ();
-	type MinimumPeriod = MinimumPeriod;
-	type WeightInfo = ();
-}
-parameter_types! {
-	pub const SignedClaimHandicap: u64 = 2;
-	pub const TombstoneDeposit: u64 = 16;
-	pub const DepositPerContract: u64 = 8 * DepositPerStorageByte::get();
-	pub const DepositPerStorageByte: u64 = 10_000;
-	pub const DepositPerStorageItem: u64 = 10_000;
-	pub RentFraction: Perbill = PerThing::from_rational(4u32, 10_000u32);
-	pub const SurchargeReward: u64 = 500_000;
-	pub const MaxDepth: u32 = 100;
-	pub const MaxValueSize: u32 = 16_384;
-	pub const DeletionQueueDepth: u32 = 1024;
-	pub const DeletionWeightLimit: Weight = 500_000_000_000;
-	pub const MaxCodeSize: u32 = 100 * 1024;
-}
-
-parameter_types! {
-	pub const TransactionByteFee: u64 = 0;
-}
-
-impl Convert<Weight, BalanceOf<Self>> for Test {
-	fn convert(w: Weight) -> BalanceOf<Self> {
-		w.into()
-	}
-}
-
-impl pallet_contracts::Config for Test {
-	type Time = Timestamp;
-	type Randomness = Randomness;
-	type Currency = Balances;
-	type Event = Event;
-	type RentPayment = ();
-	type SignedClaimHandicap = SignedClaimHandicap;
-	type TombstoneDeposit = TombstoneDeposit;
-	type DepositPerContract = DepositPerContract;
-	type DepositPerStorageByte = DepositPerStorageByte;
-	type DepositPerStorageItem = DepositPerStorageItem;
-	type RentFraction = RentFraction;
-	type SurchargeReward = SurchargeReward;
-	type MaxDepth = MaxDepth;
-	type MaxValueSize = MaxValueSize;
-	type WeightPrice = Self;
-	type WeightInfo = ();
-	type ChainExtension = Self;
-	type DeletionQueueDepth = DeletionQueueDepth;
-	type DeletionWeightLimit = DeletionWeightLimit;
-	type MaxCodeSize = MaxCodeSize;
-}
-const A:[u8; 32] = [1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 1,1,1,1,1, 0,0,0,0,0, 0,0,0,0,0, 0,0];
-const B:[u8; 32] = [2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2, 2,2,2,2,2, 0,0,0,0,0, 0,0,0,0,0, 0,0];
-pub const ALICE: AccountId32 = AccountId32::new(A);
-pub const BOB: AccountId32 = AccountId32::new(B);
-//pub const CHARLIE: AccountId32 = AccountId32::new([3u8; 32]);
-//pub const DJANGO: AccountId32 = AccountId32::new([4u8; 32]);
 
 const GAS_LIMIT: Weight = 1000_000_000_000;
-
-pub struct ExtBuilder {
-	existential_deposit: u64,
-}
-impl Default for ExtBuilder {
-	fn default() -> Self {
-		Self {
-			existential_deposit: 1,
-		}
-	}
-}
-impl ExtBuilder {
-	pub fn existential_deposit(mut self, existential_deposit: u64) -> Self {
-		self.existential_deposit = existential_deposit;
-		self
-	}
-	pub fn set_associated_consts(&self) {
-		EXISTENTIAL_DEPOSIT.with(|v| *v.borrow_mut() = self.existential_deposit);
-	}
-	pub fn build(self) -> sp_io::TestExternalities {
-		self.set_associated_consts();
-		let mut t = frame_system::GenesisConfig::default().build_storage::<Test>().unwrap();
-		pallet_balances::GenesisConfig::<Test> {
-			balances: vec![],
-		}.assimilate_storage(&mut t).unwrap();
-		pallet_contracts::GenesisConfig {
-			current_schedule: Schedule::<Test> {
-				enable_println: true,
-				..Default::default()
-			},
-		}.assimilate_storage(&mut t).unwrap();
-		pallet_evm::GenesisConfig{
-			accounts: std::collections::BTreeMap::new(),
-		}.assimilate_storage::<Test>(&mut t).unwrap();		
-		let mut ext = sp_io::TestExternalities::new(t);
-		ext.execute_with(|| System::set_block_number(1));
-		ext
-	}
-}
 
 /// Load a given wasm module represented by a .wat file and returns a wasm binary contents along
 /// with it's hash.

@@ -28,6 +28,7 @@ use sp_runtime::{
 	traits::{BlakeTwo256, IdentityLookup},
 	BuildStorage,
 };
+use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
 
 use crate as pallet_hybird_vm;
 
@@ -123,6 +124,61 @@ impl pallet_timestamp::Config for Test {
 	type WeightInfo = ();
 }
 
+
+impl hp_system::EvmHybirdVMExtension<Test> for Test{
+	fn call_vm4evm(
+		origin: OriginFor<Test>,
+		data: Vec<u8>,
+		target_gas: Option<u64>
+		) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>
+	{
+		HybirdVM::call_wasm4evm(origin, data, target_gas)
+	}
+}
+
+fn hash(a: u64) -> H160 {
+	H160::from_low_u64_be(a)
+}
+
+pub struct MockPrecompileSet<T> {
+	_marker: PhantomData<T>,
+};
+
+impl<T> PrecompileSet for MockPrecompileSet<T> 
+where
+     T: pallet_evm::Config + EvmHybirdVMExtension<T>,
+{
+	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
+		let address = handle.code_address();
+		match handle.code_address() {
+			// Ethereum precompiles :
+			a if a == hash(1) => Some(ECRecover::execute(handle)),
+			a if a == hash(2) => Some(Sha256::execute(handle)),
+			a if a == hash(3) => Some(Ripemd160::execute(handle)),
+			a if a == hash(4) => Some(Identity::execute(handle)),
+			a if a == hash(5) => Some(pallet-evm-precompile-call-hybird-vm::CallHybirdVM<T>::execute(handle)),
+			_ => None,
+		}
+	}
+	
+	fn is_precompile(&self, address: H160, _gas: u64) -> IsPrecompileResult {
+		IsPrecompileResult::Answer {
+			is_precompile: [hash(1), hash(2), hash(3), hash(4), hash(5)].contains(&address),
+			extra_cost: 0,
+		}
+	}
+}
+
+pub struct CompactAddressMapping;
+
+impl AddressMapping<AccountId32> for CompactAddressMapping {
+	fn into_account_id(address: H160) ->  AccountId32 {	
+		let mut data = [0u8; 32];
+		data[0..20].copy_from_slice(&address[..]);
+		AccountId32::from(data)
+	}
+}
+
 pub struct FixedGasPrice;
 impl FeeCalculator for FixedGasPrice {
 	fn min_gas_price() -> (U256, Weight) {
@@ -147,28 +203,29 @@ parameter_types! {
 	pub BlockGasLimit: U256 = U256::from(BLOCK_GAS_LIMIT);
 	pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE);
 	pub WeightPerGas: Weight = Weight::from_parts(20_000, 0);
-	pub MockPrecompiles: MockPrecompileSet = MockPrecompileSet;
+	pub MockPrecompiles: MockPrecompileSet<Test> = MockPrecompileSet<Test>;
 	pub SuicideQuickClearLimit: u32 = 0;
+	pub const ChainId: u64 = 42;
 }
 
 impl pallet_evm::Config for Test {
 	type FeeCalculator = FixedGasPrice;
-	type GasWeightMapping = crate::FixedGasWeightMapping<Self>;
+	type GasWeightMapping = pallet_evm::FixedGasWeightMapping<Self>;
 	type WeightPerGas = WeightPerGas;
 
-	type BlockHashMapping = crate::SubstrateBlockHashMapping<Self>;
-	type CallOrigin = EnsureAddressRoot<Self::AccountId>;
+	type BlockHashMapping = pallet_evm::SubstrateBlockHashMapping<Self>;
+	type CallOrigin = EnsureAddressTruncated;
 
-	type WithdrawOrigin = EnsureAddressNever<Self::AccountId>;
-	type AddressMapping = IdentityAddressMapping;
+	type WithdrawOrigin = EnsureAddressTruncated;
+	type AddressMapping = CompactAddressMapping;
 	type Currency = Balances;
 
 	type RuntimeEvent = RuntimeEvent;
-	type PrecompilesType = MockPrecompileSet;
+	type PrecompilesType = MockPrecompileSet<Self>;
 	type PrecompilesValue = MockPrecompiles;
-	type ChainId = ();
+	type ChainId = ChainId;
 	type BlockGasLimit = BlockGasLimit;
-	type Runner = crate::runner::stack::Runner<Self>;
+	type Runner = pallet_evm::runner::stack::Runner<Self>;
 	type OnChargeTransaction = ();
 	type OnCreate = ();
 	type FindAuthor = FindAuthorTruncated;
@@ -176,6 +233,25 @@ impl pallet_evm::Config for Test {
 	type SuicideQuickClearLimit = SuicideQuickClearLimit;
 	type Timestamp = Timestamp;
 	type WeightInfo = ();
+}
+
+impl Convert<Weight, BalanceOf<Self>> for Test {
+	fn convert(w: Weight) -> BalanceOf<Self> {
+		w.into()
+	}
+}
+
+impl pallet_contracts::chain_extension::ChainExtension<Test> for Test{
+    fn call<E>(func_id: u32, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
+	where
+		E: Ext<T = Test>,
+		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>
+	{
+		match func_id {
+			5 => pallet_hybird_vm::call_evm4wasm::<E>(env),
+			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),			
+		}
+	}
 }
 
 pub enum AllowBalancesCall {}
@@ -225,7 +301,7 @@ impl pallet_contracts::Config for Runtime {
 	type CallStack = [pallet_contracts::Frame<Self>; 23];
 	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
 	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
-	type ChainExtension = ();
+	type ChainExtension = Self;
 	type Schedule = Schedule;
 	type AddressGenerator = pallet_contracts::DefaultAddressGenerator;
 	type MaxCodeLen = ConstU32<{ 128 * 1024 }>;
@@ -255,8 +331,10 @@ impl pallet_hybird_vm::Config for Test {
 	type EnableCallWasmVM = EnableCallWasmVM;
 }
 
-pub const ALICE: AccountId32 = AccountId32::new([21u8; 32]);
-pub const Bob: AccountId32 = AccountId32::new([31u8; 32]);
+const A:[u8; 32] = [1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 0,0,0,0,0, 0,0,0,0,0, 0,0];
+const B:[u8; 32] = [2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 5,5,5,5,5, 0,0,0,0,0, 0,0,0,0,0, 0,0];
+pub const ALICE: AccountId32 = AccountId32::new(A);
+pub const BOB: AccountId32 = AccountId32::new(B);
 
 pub struct ExtBuilder {
 	existential_deposit: u64,
@@ -282,6 +360,15 @@ impl ExtBuilder {
 		pallet_balances::GenesisConfig::<Test> { balances: vec![] }
 			.assimilate_storage(&mut t)
 			.unwrap();
+		pallet_contracts::GenesisConfig {
+			current_schedule: Schedule::<Test> {
+				enable_println: true,
+				..Default::default()
+			},
+		}.assimilate_storage(&mut t).unwrap();
+		pallet_evm::GenesisConfig{
+			accounts: std::collections::BTreeMap::new(),
+		}.assimilate_storage::<Test>(&mut t).unwrap();			
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext
