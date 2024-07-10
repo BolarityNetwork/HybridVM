@@ -47,15 +47,14 @@ pub mod pallet {
 	pub trait Config: frame_system::Config + pallet_contracts::Config + pallet_evm::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 
-        type Call: From<Call<Self>>;
 		// Currency type for balance storage.
 		type Currency: Currency<Self::AccountId> + Inspect<Self::AccountId>;
 		
 		#[pallet::constant]
-		type Enable2EVM: Get<bool>;
+		type EnableCallEVM: Get<bool>;
 		
 		#[pallet::constant]
-		type Enable2WasmC: Get<bool>;		
+		type EnableCallWasmVM: Get<bool>;		
 	}
 
 	#[pallet::pallet]
@@ -65,7 +64,7 @@ pub mod pallet {
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
 		EVMExecuted(H160),
-		WasmCExecuted(T::AccountId),
+		WasmVMExecuted(T::AccountId),
 		HybirdVMCalled(T::AccountId),
 	}
 
@@ -73,7 +72,7 @@ pub mod pallet {
 	#[derive(PartialEq)]
 	pub enum Error<T> {
 		EVMExecuteFailed,
-		WasmCExecuteFailed,
+		WasmVMExecuteFailed,
 	}
 
 	#[pallet::hooks]

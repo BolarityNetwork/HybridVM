@@ -88,8 +88,8 @@ where
 		data: Vec<u8>,
 		target_gas: Option<Weight>
 	) -> Result<(Vec<u8>, Weight)> {
-		if !T::Enable2WasmC::get() {
-			return Err(DispatchError::from("Enable2WasmC is false, can't call wasm contract."));
+		if !T::EnableCallWasmVM::get() {
+			return Err(DispatchError::from("EnableCallWasmVM is false, can't call wasm VM."));
 		}
 		
 		let input: Vec<u8>;
@@ -144,8 +144,8 @@ where
 	C::AccountId: From<AccountId32> + Into<AccountId32>,
 {
 	pub fn  call_evm4wasm<E: Ext<T=C>>(mut env: Environment<E, InitState>)-> Result<RetVal> {
-		if !C::Enable2EVM::get() {
-			return Err(DispatchError::from("Enable2EVM is false, can't call evm."));
+		if !C::EnableCallEVM::get() {
+			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
 		}
 		
 		let mut source_arr = [0u8; 32];
