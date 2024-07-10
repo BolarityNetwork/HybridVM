@@ -22,17 +22,15 @@
 pub extern crate alloc;
 
 use alloc::string::{String, ToString};
-use frame_support::traits::Currency;
 
 use codec::{Encode, Decode};
 use sp_std::vec;
 use sp_std::vec::Vec;
 use sp_std::{prelude::*, str,};
 use core::fmt;
-use sp_core::crypto::UncheckedFrom;
 
 use pallet_contracts::chain_extension::{
-	Environment, Ext, InitState, RetVal, SysConfig, 
+	Environment, Ext, InitState, RetVal, 
 };
 use pallet_contracts::{DebugInfo, CollectEvents, Determinism};
 use sp_runtime::app_crypto::sp_core::{H160, U256};
@@ -45,12 +43,16 @@ use fp_evm::ExecutionInfoV2;
 use frame_support::sp_runtime::AccountId32;
 use byte_slice_cast::AsByteSlice;
 
-pub use super::*;
+use super::*;
+use frame_system::pallet_prelude::*;
+use frame_support::pallet_prelude::*;
 	
 type Result<T> = sp_std::result::Result<T, DispatchError>;
 type ResultBox<T> = sp_std::result::Result<T, CustomError>;
 
-pub struct InterCall<T>(_);
+pub struct InterCall<T: Config> {
+	_marker: PhantomData<T>,
+}
 
 #[derive(Deserialize, Encode, Decode, Debug)]
 #[allow(non_snake_case)]
@@ -77,7 +79,10 @@ fn str2s(s: String) -> &'static str {
 
 
 
-impl<T: Config> InterCall<T> {	
+impl<T: Config> InterCall<T> 
+where
+	T::AccountId: From<AccountId32> + Into<AccountId32>,
+{	
 	pub fn call_wasm4evm(
 		origin: OriginFor<T>,
 		data: Vec<u8>,
@@ -134,16 +139,18 @@ impl<T: Config> InterCall<T> {
 	}	
 }
 
-impl<T: Config> InterCall<T>
+impl<C: Config> InterCall<C>
+where
+	C::AccountId: From<AccountId32> + Into<AccountId32>,
 {
-	pub fn  call_evm4wasm(mut env: Environment<dyn Ext<T=T>, InitState>)-> Result<RetVal> {
-		if !T::Enable2EVM::get() {
+	pub fn  call_evm4wasm<E: Ext<T=C>>(mut env: Environment<E, InitState>)-> Result<RetVal> {
+		if !C::Enable2EVM::get() {
 			return Err(DispatchError::from("Enable2EVM is false, can't call evm."));
 		}
 		
 		let mut source_arr = [0u8; 32];
 		let caller = env.ext().caller();
-		let caller_accountid = caller.account_id()?;
+		let caller_accountid: AccountId32 = caller.account_id()?.clone().into();
 		source_arr[0..32].copy_from_slice(caller_accountid.as_byte_slice());
 		let source = H160::from_slice(&source_arr[0..20]);
 		
@@ -249,7 +256,7 @@ impl fmt::Display for CustomError {
 pub mod vm_codec {
 	use super::*;
 	
-	use sp_runtime::{AccountId32, traits::{BlakeTwo256, Hash}};
+	use sp_runtime::{AccountId32, traits::BlakeTwo256};
 	use codec::Compact;
 	use core::mem::size_of;
 	use sha3::{Digest, Keccak256};
@@ -617,7 +624,7 @@ pub mod vm_codec {
 				hex::decode_to_slice(&account[2..], &mut bytes)
 						.map_err(|_| "invalid hex address.")
 						.map(|_| AccountId32::from(bytes)));
-		let selector = &BlakeTwo256::hash(call_vm.Fun.as_bytes())[0..4];
+		let selector = &<BlakeTwo256 as sp_core::Hasher>::hash(call_vm.Fun.as_bytes())[0..4];
 		let mut data: Vec<u8> = Vec::new();
 		let mut i: usize = 0;
 		

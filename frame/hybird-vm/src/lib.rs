@@ -23,14 +23,14 @@ mod tests;
 mod interoperate;
 
 use frame_support::traits::{
-	tokens::{fungible::Inspect, ExistenceRequirement},
+	tokens::fungible::Inspect,
 	Currency, Get,
 };
-use scale_info::prelude::string::String;
-use sp_core::{crypto::AccountId32, Hasher, H256};
-use sp_std::collections::btree_map::BTreeMap;
+use frame_support::sp_runtime::AccountId32;
+use sp_core::H160;
 use sp_std::vec::Vec;
 use ethereum::TransactionV2 as Transaction;
+use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
 use self::interoperate::InterCall;
 
 pub use self::pallet::*;
@@ -41,6 +41,8 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
+	type Result<T> = sp_std::result::Result<T, DispatchError>;
+	
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_contracts::Config + pallet_evm::Config {
 		type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
@@ -83,7 +85,7 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn call_hybird_vm(
 			origin: OriginFor<T>,
-			transaction: Transaction,
+			_transaction: Transaction,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
@@ -95,6 +97,8 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T>
+	where
+	    T::AccountId: From<AccountId32> + Into<AccountId32>,
 	{
 		pub fn call_wasm4evm(
 		    origin: OriginFor<T>,
@@ -104,7 +108,7 @@ pub mod pallet {
 			InterCall::<T>::call_wasm4evm(origin, data, target_gas)
 		}
 
-	    pub fn  call_evm4wasm(mut env: Environment<Ext<T>, InitState>)-> Result<RetVal>
+	    pub fn  call_evm4wasm<E: Ext<T=T>>(env: Environment<E, InitState>)-> Result<RetVal>
 		{
 			InterCall::<T>::call_evm4wasm(env)
 		}
