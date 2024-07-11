@@ -40,6 +40,7 @@ use pretty_assertions::assert_eq;
 use ink_env::call::{Selector, ExecutionInput};
 use sha3::{Keccak256, Digest};
 
+use pallet_contracts::{DebugInfo, CollectEvents, Determinism};
 use pallet_evm::{Runner, ExitReason, CallInfo, CreateInfo, };
 
 use std::error::Error;
@@ -200,7 +201,13 @@ fn test_wasm_call_evm(){
 				U256::default(),
 				100_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,				
 				<Test as pallet_evm::Config>::config(),
 			);
 
@@ -243,7 +250,13 @@ fn test_wasm_call_evm(){
 				U256::default(),
 				100_000_000,
 				Some(U256::default()),
-				Some(U256::from(0)),
+			    None,
+			    Some(U256::from(0)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 
@@ -285,7 +298,11 @@ fn test_wasm_call_evm(){
 				wasm_addr,
 				0,
 				GAS_LIMIT,
+				None,
 				Encode::encode(&call).to_vec(),
+				DebugInfo::Skip,
+				CollectEvents::Skip,
+				Determinism::Enforced
 			).exec_result.unwrap();
 		assert!(result.is_success());
 		println!("Alice transfer to Bob from wasm_call_evm:{}", transfer_value);
@@ -298,7 +315,13 @@ fn test_wasm_call_evm(){
 				U256::default(),
 				100_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 
@@ -380,7 +403,11 @@ fn test_evm_call_wasm(){
 					wasm_addr.clone(),
 					0,
 					GAS_LIMIT,
+					None,
 					transfer_call.encode(),
+				    DebugInfo::Skip,
+				    CollectEvents::Skip,
+				    Determinism::Enforced					
 				).exec_result.unwrap();
 				
 		assert!(result.is_success());
@@ -395,7 +422,13 @@ fn test_evm_call_wasm(){
 			U256::default(),
 			100_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -431,8 +464,12 @@ fn test_evm_call_wasm(){
 					wasm_addr.clone(),
 					0,
 					GAS_LIMIT,
+					None,
 					//Encode::encode(&balance_of_call).to_vec(),
 					balance_of_call.encode(),
+				    DebugInfo::Skip,
+				    CollectEvents::Skip,
+				    Determinism::Enforced					
 				).exec_result.unwrap();
 		assert!(result.is_success());
 		
@@ -458,7 +495,13 @@ fn test_evm_call_wasm(){
 				U256::default(),
 				100_000_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 		assert_ok!(&call4evm);
@@ -471,7 +514,11 @@ fn test_evm_call_wasm(){
 					wasm_addr.clone(),
 					0,
 					GAS_LIMIT,
+					None,
 					Encode::encode(&balance_of_call).to_vec(),
+				    DebugInfo::Skip,
+				    CollectEvents::Skip,
+				    Determinism::Enforced					
 				).exec_result.unwrap();
 		assert!(result.is_success());
 	
@@ -531,7 +578,13 @@ fn test_wasm_call_evm_balance(){
 			U256::default(),
 			100_000_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -572,7 +625,13 @@ fn test_wasm_call_evm_balance(){
 				U256::default(),
 				100_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 
@@ -613,7 +672,11 @@ fn test_wasm_call_evm_balance(){
 				wasm_addr,
 				0,
 				GAS_LIMIT,
+				None,
 				Encode::encode(&call).to_vec(),
+				DebugInfo::Skip,
+				CollectEvents::Skip,
+				Determinism::Enforced				
 			).exec_result.unwrap();
 		println!("call wasmCallEvmBalance result:{:?}", result);	
 		assert!(result.is_success());
@@ -678,7 +741,11 @@ fn test_evm_call_wasm_balance(){
 					wasm_addr.clone(),
 					0,
 					GAS_LIMIT,
+					None,
 					transfer_call.encode(),
+				    DebugInfo::Skip,
+				    CollectEvents::Skip,
+				    Determinism::Enforced					
 				).exec_result.unwrap();
 				
 		assert!(result.is_success());
@@ -694,7 +761,13 @@ fn test_evm_call_wasm_balance(){
 			U256::default(),
 			100_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -734,7 +807,13 @@ fn test_evm_call_wasm_balance(){
 				U256::default(),
 				100_000_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 		assert_ok!(&call4evm);
@@ -815,7 +894,13 @@ fn test_wasm_call_evm_echo(){
 			U256::default(),
 			100_000_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -857,7 +942,11 @@ fn test_wasm_call_evm_echo(){
 				wasm_addr,
 				0,
 				GAS_LIMIT,
+				None,
 				Encode::encode(&call).to_vec(),
+				DebugInfo::Skip,
+				CollectEvents::Skip,
+				Determinism::Enforced				
 			).exec_result.unwrap();
 		println!("call wasmCallEvmProxy result:{:?}", result);	
 		assert!(result.is_success());
@@ -929,7 +1018,13 @@ fn test_evm_call_wasm_echo(){
 			U256::default(),
 			100_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -977,7 +1072,13 @@ fn test_evm_call_wasm_echo(){
 				U256::default(),
 				100_000_000_000,
 				Some(U256::default()),
-				Some(U256::from(1)),
+			    None,
+			    Some(U256::from(1)),
+			    Vec::new(),
+			    true,
+			    true,
+			    None,
+			    None,		
 				<Test as pallet_evm::Config>::config(),
 			);
 		assert_ok!(&call4evm);
