@@ -1,5 +1,5 @@
-// Copyright (C) HybirdVM.
-// This file is part of HybirdVM.
+// Copyright (C) HybridVM.
+// This file is part of HybridVM.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@
 use sp_std::vec::Vec;
 use frame_system::pallet_prelude::*;
 
-pub trait EvmHybirdVMExtension<C: frame_system::Config> {
-	fn call_hybird_vm(
+pub trait EvmHybridVMExtension<C: frame_system::Config> {
+	fn call_Hybrid_vm(
 			origin: OriginFor<C>,
 			data: Vec<u8>,
 			target_gas: Option<u64>

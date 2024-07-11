@@ -1,5 +1,5 @@
-// Copyright (C) HybirdVM.
-// This file is part of HybirdVM.
+// Copyright (C) HybridVM.
+// This file is part of HybridVM.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -20,21 +20,21 @@ use fp_evm::{ExitError, ExitSucceed, Precompile, PrecompileFailure};
 use fp_evm::{PrecompileHandle, PrecompileOutput, PrecompileResult};
 use pallet_evm::AddressMapping;
 use frame_system::RawOrigin;
-use hp_system::EvmHybirdVMExtension;
+use hp_system::EvmHybridVMExtension;
 
-pub struct CallHybirdVM<T> {
+pub struct CallHybridVM<T> {
 	_marker: PhantomData<T>,
 }
 
-impl<T> Precompile for CallHybirdVM<T> where
-	T: pallet_evm::Config + EvmHybirdVMExtension<T>,
+impl<T> Precompile for CallHybridVM<T> where
+	T: pallet_evm::Config + EvmHybridVMExtension<T>,
 {
 	fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
 		let context = handle.context();
 		let target_gas = handle.gas_limit();
 		let origin = RawOrigin::from(Some(T::AddressMapping::into_account_id(context.caller)));
 		
-		match T::call_hybird_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
+		match T::call_Hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
 			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, output:ret.0}),
 			Err(e) => {
 				let err_str:&'static str = e.into();
