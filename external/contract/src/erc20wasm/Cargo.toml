@@ -1,8 +1,11 @@
 [package]
-name = "erc20test"
+name = "erc20"
 version = "5.0.0"
 authors = ["Parity Technologies <admin@parity.io> and modified by HybridVM"]
 edition = "2021"
+
+[profile.release]
+overflow-checks = false
 
 [dependencies]
 ink_primitives = { version = "5.0.0", git = "https://github.com/paritytech/ink", default-features = false }
