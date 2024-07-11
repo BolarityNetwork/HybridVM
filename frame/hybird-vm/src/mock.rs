@@ -1,5 +1,5 @@
-// Copyright (C) HybirdVM.
-// This file is part of HybirdVM.
+// Copyright (C) HybridVM.
+// This file is part of HybridVM.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -29,7 +29,7 @@ use sp_runtime::{
 	traits::{Convert, BlakeTwo256, IdentityLookup},
 	BuildStorage, Perbill,
 };
-use hp_system::EvmHybirdVMExtension;
+use hp_system::EvmHybridVMExtension;
 use frame_system::pallet_prelude::*;
 use frame_support::pallet_prelude::*;
 use fp_evm::Precompile;
@@ -40,7 +40,7 @@ use pallet_evm::{
 	};
 use pallet_contracts::chain_extension::SysConfig;
 
-use crate as pallet_hybird_vm;
+use crate as pallet_Hybrid_vm;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u64;
@@ -53,7 +53,7 @@ frame_support::construct_runtime!(
 		Randomness: pallet_insecure_randomness_collective_flip,
 		Evm: pallet_evm,
 		Contracts: pallet_contracts,
-		HybirdVM: pallet_hybird_vm,
+		HybridVM: pallet_Hybrid_vm,
 	}
 );
 
@@ -127,15 +127,15 @@ impl pallet_timestamp::Config for Test {
 }
 
 
-impl hp_system::EvmHybirdVMExtension<Test> for Test{
-	fn call_hybird_vm(
+impl hp_system::EvmHybridVMExtension<Test> for Test{
+	fn call_Hybrid_vm(
 		origin: OriginFor<Test>,
 		data: Vec<u8>,
 		target_gas: Option<u64>
 		) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>
 	{
 		let target_weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(target_gas.unwrap_or(0), false);
-		let (result_output, result_weight) = HybirdVM::call_wasm4evm(origin, data, target_weight)?;
+		let (result_output, result_weight) = HybridVM::call_wasm4evm(origin, data, target_weight)?;
 		
 		Ok((result_output, <Test as pallet_evm::Config>::GasWeightMapping::weight_to_gas(result_weight)))
 	}
@@ -149,7 +149,7 @@ pub struct MockPrecompileSet<T>(PhantomData<T>);
 
 impl<T> PrecompileSet for MockPrecompileSet<T> 
 where
-     T: pallet_evm::Config + EvmHybirdVMExtension<T>,
+     T: pallet_evm::Config + EvmHybridVMExtension<T>,
 {
 	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
 		match handle.code_address() {
@@ -158,7 +158,7 @@ where
 			a if a == hash(2) => Some(Sha256::execute(handle)),
 			a if a == hash(3) => Some(Ripemd160::execute(handle)),
 			a if a == hash(4) => Some(Identity::execute(handle)),
-			a if a == hash(5) => Some(pallet_evm_precompile_call_hybird_vm::CallHybirdVM::<T>::execute(handle)),
+			a if a == hash(5) => Some(pallet_evm_precompile_call_Hybrid_vm::CallHybridVM::<T>::execute(handle)),
 			_ => None,
 		}
 	}
@@ -246,9 +246,9 @@ impl Convert<Weight, BalanceOf<Self>> for Test {
 }
 
 #[derive(Default)]
-pub struct HybirdVMChainExtension;
+pub struct HybridVMChainExtension;
 
-impl pallet_contracts::chain_extension::ChainExtension<Test> for HybirdVMChainExtension{
+impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainExtension{
     fn call<E>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
 	where
 		E: Ext<T = Test>,
@@ -256,7 +256,7 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybirdVMChainEx
 	{
 		let func_id = env.func_id();
 		match func_id {
-			5 => HybirdVM::call_evm4wasm::<E>(env),
+			5 => HybridVM::call_evm4wasm::<E>(env),
 			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),			
 		}
 	}
@@ -337,7 +337,7 @@ impl pallet_contracts::Config for Test {
 	type DepositPerByte = DepositPerByte;
 	type CallStack = [pallet_contracts::Frame<Self>; 23];
 	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
-	type ChainExtension = HybirdVMChainExtension;
+	type ChainExtension = HybridVMChainExtension;
 	type Schedule = Schedule;
 	type AddressGenerator = pallet_contracts::DefaultAddressGenerator;
 	type MaxCodeLen = ConstU32<{ 128 * 1024 }>;
@@ -363,7 +363,7 @@ parameter_types! {
 	pub const EnableCallWasmVM: bool = true;
 }
 
-impl pallet_hybird_vm::Config for Test {
+impl pallet_Hybrid_vm::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type EnableCallEVM = EnableCallEVM;
