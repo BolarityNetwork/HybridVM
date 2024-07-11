@@ -1,5 +1,5 @@
 [package]
-name = "pallet-Hybrid-vm"
+name = "pallet-hybrid-vm"
 version = "0.2.0"
 description = "Engine for Hybrid vm"
 repository.workspace = true
@@ -53,7 +53,7 @@ pallet-evm-precompile-simple = { workspace = true, default-features = false}
 
 ink_env = { workspace = true }
 
-pallet-evm-precompile-call-Hybrid-vm = { version = "0.1.0", path = "../evm-precompile/call-Hybrid-vm" }
+pallet-evm-precompile-call-hybrid-vm = { version = "0.1.0", path = "../evm-precompile/call-hybrid-vm" }
 hp-system = { version = "0.1.0", path = "../../primitives/system" }
 
 [features]

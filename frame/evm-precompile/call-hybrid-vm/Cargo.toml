@@ -1,5 +1,5 @@
 [package]
-name = "pallet-evm-precompile-call-Hybrid-vm"
+name = "pallet-evm-precompile-call-hybrid-vm"
 version = "0.1.0"
 description = "Call Hybrid vm precompiles for EVM pallet."
 repository.workspace = true
@@ -25,7 +25,7 @@ pallet-evm = { workspace = true, default-features = false}
 fp-evm = { workspace = true, default-features = false}
 
 hp-system = { version = "0.1.0", path = "../../../primitives/system", default-features = false }
-pallet-Hybrid-vm = { version = "0.2.0", path = "../../Hybrid-vm", default-features = false }
+pallet-hybrid-vm = { version = "0.2.0", path = "../../hybrid-vm", default-features = false }
 
 [dev-dependencies]
 frame-system = { workspace = true, default-features = false}
@@ -44,7 +44,7 @@ std = [
 	"evm/std",
 	"codec/std",
 	"pallet-evm/std",
-	"pallet-Hybrid-vm/std",
+	"pallet-hybrid-vm/std",
 ]
 
 runtime-benchmarks = [

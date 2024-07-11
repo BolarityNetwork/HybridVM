@@ -128,7 +128,7 @@ impl pallet_timestamp::Config for Test {
 
 
 impl hp_system::EvmHybridVMExtension<Test> for Test{
-	fn call_Hybrid_vm(
+	fn call_hybrid_vm(
 		origin: OriginFor<Test>,
 		data: Vec<u8>,
 		target_gas: Option<u64>
@@ -158,7 +158,7 @@ where
 			a if a == hash(2) => Some(Sha256::execute(handle)),
 			a if a == hash(3) => Some(Ripemd160::execute(handle)),
 			a if a == hash(4) => Some(Identity::execute(handle)),
-			a if a == hash(5) => Some(pallet_evm_precompile_call_Hybrid_vm::CallHybridVM::<T>::execute(handle)),
+			a if a == hash(5) => Some(pallet_evm_precompile_call_hybrid_vm::CallHybridVM::<T>::execute(handle)),
 			_ => None,
 		}
 	}

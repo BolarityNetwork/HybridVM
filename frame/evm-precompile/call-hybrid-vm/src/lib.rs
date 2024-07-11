@@ -34,7 +34,7 @@ impl<T> Precompile for CallHybridVM<T> where
 		let target_gas = handle.gas_limit();
 		let origin = RawOrigin::from(Some(T::AddressMapping::into_account_id(context.caller)));
 		
-		match T::call_Hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
+		match T::call_hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
 			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, output:ret.0}),
 			Err(e) => {
 				let err_str:&'static str = e.into();

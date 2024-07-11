@@ -82,7 +82,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn call_Hybrid_vm(
+		pub fn call_hybrid_vm(
 			origin: OriginFor<T>,
 			_transaction: Transaction,
 		) -> DispatchResultWithPostInfo {
