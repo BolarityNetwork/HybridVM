@@ -107,7 +107,7 @@ pub mod pallet {
 			InterCall::<T>::call_wasm4evm(origin, data, target_gas)
 		}
 
-	    pub fn  call_evm4wasm<E: Ext<T=T>>(env: Environment<E, InitState>)-> Result<RetVal>
+	    pub fn call_evm4wasm<E: Ext<T=T>>(env: Environment<E, InitState>)-> Result<RetVal>
 		{
 			InterCall::<T>::call_evm4wasm(env)
 		}

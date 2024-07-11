@@ -53,7 +53,7 @@ pallet-evm-precompile-simple = { workspace = true, default-features = false}
 ink_env = { workspace = true }
 
 pallet-evm-precompile-call-hybird-vm = { version = "0.1.0", path = "../evm-precompile/call-hybird-vm" }
-
+hp-system = { version = "0.1.0", path = "../../primitives/system" }
 
 [features]
 default = ["std"]
@@ -75,6 +75,7 @@ std = [
 	"byte-slice-cast/std",
 	"sha3/std",
 	"blake2-rfc/std",
+	"pallet-balances/std",
 	"pallet-contracts/std",
 	"pallet-evm/std",
 	"fp-evm/std",

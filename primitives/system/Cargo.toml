@@ -15,6 +15,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 # Substrate
 sp-std = { workspace = true, default-features = false}
 sp-runtime = { workspace = true, default-features = false}
+frame-support = { workspace = true, default-features = false}
 frame-system = { workspace = true, default-features = false}
 
 [features]
@@ -22,5 +23,6 @@ default = [ "std" ]
 std = [
 	"sp-std/std",
 	"sp-runtime/std",
+	"frame-support/std",
 	"frame-system/std",
 ]
