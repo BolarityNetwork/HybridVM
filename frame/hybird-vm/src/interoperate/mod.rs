@@ -86,7 +86,7 @@ where
 	pub fn call_wasm4evm(
 		origin: OriginFor<T>,
 		data: Vec<u8>,
-		target_gas: Option<Weight>
+		target_gas: Weight,
 	) -> Result<(Vec<u8>, Weight)> {
 		if !T::EnableCallWasmVM::get() {
 			return Err(DispatchError::from("EnableCallWasmVM is false, can't call wasm VM."));
@@ -100,12 +100,8 @@ where
 			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
 		}
 				
-		let mut gas_limit: Weight = Weight::zero();
-		match target_gas {
-			Some(t) =>  gas_limit = t,
-			None => (),
-		}
-		
+		let gas_limit: Weight = target_gas;
+				
 		let origin = ensure_signed(origin)?;
 		let target = T::AccountId::from(target);
 		

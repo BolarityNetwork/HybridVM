@@ -47,6 +47,7 @@ wat = { workspace = true }
 pallet-balances = { workspace = true, default-features = false}
 pallet-insecure-randomness-collective-flip = { workspace = true, default-features = false}
 pallet-timestamp = { workspace = true, default-features = false}
+pallet-transaction-payment = { workspace = true, default-features = false}
 
 pallet-evm-precompile-simple = { workspace = true, default-features = false}
 
@@ -76,6 +77,7 @@ std = [
 	"sha3/std",
 	"blake2-rfc/std",
 	"pallet-balances/std",
+	"pallet-transaction-payment/std",
 	"pallet-contracts/std",
 	"pallet-evm/std",
 	"fp-evm/std",

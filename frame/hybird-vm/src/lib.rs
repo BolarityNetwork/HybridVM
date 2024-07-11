@@ -102,7 +102,7 @@ pub mod pallet {
 		pub fn call_wasm4evm(
 		    origin: OriginFor<T>,
 		    data: Vec<u8>,
-		    target_gas: Option<Weight>
+		    target_gas: Weight,
 	    ) -> Result<(Vec<u8>, Weight)> {
 			InterCall::<T>::call_wasm4evm(origin, data, target_gas)
 		}

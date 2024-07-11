@@ -17,6 +17,7 @@
 
 use sp_std::vec::Vec;
 use frame_system::pallet_prelude::*;
+use frame_support::pallet_prelude::*;
 
 pub trait EvmHybirdVMExtension<C: frame_system::Config> {
 	fn call_hybird_vm(

@@ -35,8 +35,8 @@ use frame_support::pallet_prelude::*;
 use fp_evm::Precompile;
 use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
 use pallet_evm::{
-	    AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, IsPrecompileResult, 
-        PrecompileHandle, PrecompileResult, PrecompileSet,
+	    AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
+		IsPrecompileResult, PrecompileHandle, PrecompileResult, PrecompileSet,
 	};
 use pallet_contracts::chain_extension::SysConfig;
 
@@ -108,20 +108,11 @@ impl frame_system::Config for Test {
 	type MaxConsumers = ConstU32<16>;
 }
 
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
-	type Balance = u64;
-	type RuntimeEvent = RuntimeEvent;
-	type DustRemoval = ();
 	type ExistentialDeposit = ConstU64<1>;
-	type AccountStore = System;
-	type MaxLocks = ();
-	type MaxReserves = ();
 	type ReserveIdentifier = [u8; 8];
-	type WeightInfo = ();
-	type FreezeIdentifier = ();
-	type MaxFreezes = ();
-	type RuntimeHoldReason = ();
-	type RuntimeFreezeReason = ();
+    type AccountStore = System;
 }
 
 parameter_types! {
@@ -143,7 +134,10 @@ impl hp_system::EvmHybirdVMExtension<Test> for Test{
 		target_gas: Option<u64>
 		) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>
 	{
-		HybirdVM::call_wasm4evm(origin, data, target_gas)
+		let target_weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(target_gas.unwrap_or(0), false);
+		let (result_output, result_weight) = HybirdVM::call_wasm4evm(origin, data, target_weight)?;
+		
+		Ok((result_output, <Test as pallet_evm::Config>::GasWeightMapping::weight_to_gas(result_weight)))
 	}
 }
 
@@ -202,7 +196,9 @@ impl FindAuthor<H160> for FindAuthorTruncated {
 	where
 		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
 	{
-		Some(H160::from("1234500000000000000000000000000000000000").unwrap())
+		let a:[u8; 20] = [12,34,45,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0];
+		
+		Some(H160::from(a))
 	}
 }
 const BLOCK_GAS_LIMIT: u64 = 150_000_000;
@@ -246,7 +242,7 @@ impl pallet_evm::Config for Test {
 
 impl Convert<Weight, BalanceOf<Self>> for Test {
 	fn convert(w: Weight) -> BalanceOf<Self> {
-		w.into()
+		w.ref_time()
 	}
 }
 
@@ -259,7 +255,11 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybirdVMChainEx
 		E: Ext<T = Test>,
 		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>
 	{
-		HybirdVM::call_evm4wasm::<E>(env)
+		let func_id = env.func_id();
+		match func_id {
+			5 => HybirdVM::call_evm4wasm::<E>(env),
+			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),			
+		}
 	}
 }
 
@@ -267,7 +267,7 @@ pub enum AllowBalancesCall {}
 
 impl frame_support::traits::Contains<RuntimeCall> for AllowBalancesCall {
 	fn contains(call: &RuntimeCall) -> bool {
-		matches!(call, RuntimeCall::Balances(BalancesCall::transfer_allow_death { .. }))
+		matches!(call, RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death { .. }))
 	}
 }
 
@@ -290,6 +290,34 @@ fn schedule<T: pallet_contracts::Config>() -> pallet_contracts::Schedule<T> {
 }
 
 parameter_types! {
+	pub static UploadAccount: Option<<Test as frame_system::Config>::AccountId> = None;
+	pub static InstantiateAccount: Option<<Test as frame_system::Config>::AccountId> = None;
+}
+
+pub struct EnsureAccount<T, A>(sp_std::marker::PhantomData<(T, A)>);
+impl<T: Config, A: sp_core::Get<Option<AccountId32>>>
+	EnsureOrigin<<T as frame_system::Config>::RuntimeOrigin> for EnsureAccount<T, A>
+where
+	<T as frame_system::Config>::AccountId: From<AccountId32>,
+{
+	type Success = T::AccountId;
+
+	fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
+		let who = <frame_system::EnsureSigned<_> as EnsureOrigin<_>>::try_origin(o.clone())?;
+		if matches!(A::get(), Some(a) if who != a.clone().into()) {
+			return Err(o)
+		}
+
+		Ok(who)
+	}
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn try_successful_origin() -> Result<T::RuntimeOrigin, ()> {
+		Err(())
+	}
+}
+
+parameter_types! {
 	pub const DepositPerItem: Balance = deposit(1, 0);
 	pub const DepositPerByte: Balance = deposit(0, 1);
 	pub Schedule: pallet_contracts::Schedule<Test> = schedule::<Test>();
@@ -298,6 +326,7 @@ parameter_types! {
 	pub const MaxDelegateDependencies: u32 = 32;
 }
 
+#[derive_impl(pallet_contracts::config_preludes::TestDefaultConfig)]
 impl pallet_contracts::Config for Test {
 	type Time = Timestamp;
 	type Randomness = Randomness;
@@ -308,7 +337,6 @@ impl pallet_contracts::Config for Test {
 	type DepositPerItem = DepositPerItem;
 	type DepositPerByte = DepositPerByte;
 	type CallStack = [pallet_contracts::Frame<Self>; 23];
-	type WeightPrice = pallet_transaction_payment::Pallet<Self>;
 	type WeightInfo = pallet_contracts::weights::SubstrateWeight<Self>;
 	type ChainExtension = HybirdVMChainExtension;
 	type Schedule = Schedule;
@@ -321,10 +349,13 @@ impl pallet_contracts::Config for Test {
 	type CodeHashLockupDepositPercent = CodeHashLockupDepositPercent;
 	type MaxDelegateDependencies = MaxDelegateDependencies;
 	type RuntimeHoldReason = RuntimeHoldReason;
+	type UploadOrigin = EnsureAccount<Self, UploadAccount>;
+	type InstantiateOrigin = EnsureAccount<Self, InstantiateAccount>;	
 	type Environment = ();
 	type Debug = ();
 	type Migrations = ();
 	type Xcm = ();
+	
 }
 
 
@@ -369,9 +400,10 @@ impl ExtBuilder {
 		pallet_balances::GenesisConfig::<Test> { balances: vec![] }
 			.assimilate_storage(&mut t)
 			.unwrap();
-		pallet_evm::GenesisConfig{
+		pallet_evm::GenesisConfig::<Test> {
 			accounts: std::collections::BTreeMap::new(),
-		}.assimilate_storage::<Test>(&mut t).unwrap();			
+			_marker: PhantomData,
+		}.assimilate_storage(&mut t).unwrap();			
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext
