@@ -33,7 +33,7 @@ use hp_system::EvmHybirdVMExtension;
 use frame_system::pallet_prelude::*;
 use frame_support::pallet_prelude::*;
 use fp_evm::Precompile;
-use pallet_evm_precompile_simple::{ECRecover, ECRecoverPublicKey, Identity, Ripemd160, Sha256};
+use pallet_evm_precompile_simple::{ECRecover, Identity, Ripemd160, Sha256};
 use pallet_evm::{
 	    AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
 		IsPrecompileResult, PrecompileHandle, PrecompileResult, PrecompileSet,
@@ -152,7 +152,6 @@ where
      T: pallet_evm::Config + EvmHybirdVMExtension<T>,
 {
 	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
-		let address = handle.code_address();
 		match handle.code_address() {
 			// Ethereum precompiles :
 			a if a == hash(1) => Some(ECRecover::execute(handle)),

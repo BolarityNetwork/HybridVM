@@ -25,25 +25,14 @@ use crate::mock::*;
 
 use sp_core::{U256, H160, };
 
-use pallet_contracts::{
-	//ContractInfoOf, 
-	Schedule,
-	chain_extension::{
-		Environment, Ext, SysConfig, RetVal, InitState, 
-	},
-};
+//use pallet_contracts::ContractInfoOf;
 
-use sp_core::crypto::UncheckedFrom;
 use codec::{Encode, Decode};
-use sp_runtime::{
-	traits::{BlakeTwo256, Hash, IdentityLookup, Convert, },
-	testing::{Header, H256},
-	AccountId32, DispatchError, Perbill, PerThing,
-};
+use sp_runtime::traits::{BlakeTwo256, Hash, };
 
 use frame_support::{
-	assert_noop, assert_ok, parameter_types,  
-	traits::{Currency, GenesisBuild},
+	assert_ok,   
+	traits::Currency,
 	weights::Weight,
 };
 
@@ -51,17 +40,10 @@ use pretty_assertions::assert_eq;
 use ink_env::call::{Selector, ExecutionInput};
 use sha3::{Keccak256, Digest};
 
-use pallet_evm::{
-        FeeCalculator, AddressMapping, EnsureAddressTruncated, Runner, 
-		ExitReason, CallInfo, CreateInfo, SubstrateBlockHashMapping, 
-};
+use pallet_evm::{Runner, ExitReason, CallInfo, CreateInfo, };
 
-use frame_system::Origin;
-use frame_system::pallet_prelude::*;
 use std::error::Error;
 use serde::{Deserialize, Serialize};
-
-use crate as pallet_hybird_vm;
 
 #[derive(Deserialize, Encode, Decode, Serialize, Debug)]
 #[allow(non_snake_case)]
@@ -71,11 +53,7 @@ struct CallReturn  {
 	ReturnValue:Vec<String>,
 }
 
-type UncheckedExtrinsic = frame_system::mocking::MockUncheckedExtrinsic<Test>;
-type Block = frame_system::mocking::MockBlock<Test>;
-
-
-const GAS_LIMIT: Weight = 1000_000_000_000.into();
+const GAS_LIMIT: Weight = Weight::from_parts(1_000_000_000_000, u64::MAX);
 
 /// Load a given wasm module represented by a .wat file and returns a wasm binary contents along
 /// with it's hash.
@@ -142,7 +120,7 @@ fn test_wasm_call_evm(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 		
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -152,8 +130,9 @@ fn test_wasm_call_evm(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
@@ -161,7 +140,7 @@ fn test_wasm_call_evm(){
 		);
 		
 		assert_ok!(creation);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
 		
@@ -359,7 +338,7 @@ fn test_evm_call_wasm(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -369,14 +348,15 @@ fn test_evm_call_wasm(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence  * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
 			vec![],
 		);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
@@ -403,7 +383,7 @@ fn test_evm_call_wasm(){
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
 		
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//Origin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE),
 			source,
 			evm,
 			U256::default(),
@@ -512,7 +492,7 @@ fn test_wasm_call_evm_balance(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 		
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -522,8 +502,9 @@ fn test_wasm_call_evm_balance(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
@@ -531,7 +512,7 @@ fn test_wasm_call_evm_balance(){
 		);
 		
 		assert_ok!(creation);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
 		
@@ -655,7 +636,7 @@ fn test_evm_call_wasm_balance(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -665,14 +646,15 @@ fn test_evm_call_wasm_balance(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence  * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
 			vec![],
 		);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
@@ -700,7 +682,7 @@ fn test_evm_call_wasm_balance(){
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
 		
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//Origin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE),
 			source,
 			evm,
 			U256::default(),
@@ -753,7 +735,7 @@ fn test_evm_call_wasm_balance(){
 						
 		println!("call evmCallWasmBalance reuslt:{:?}", call4evm);
 		
-		let bob_balance: u128;
+		let bob_balance: u64;
 		match call4evm.unwrap() {
 			CallInfo {
 				exit_reason: ExitReason::Succeed(_),
@@ -762,7 +744,7 @@ fn test_evm_call_wasm_balance(){
 			} => {
 				let mut a: [u8; 16] = Default::default();
 				a.copy_from_slice(&return_value[16..32]);				
-				bob_balance = u128::from_be_bytes(a);
+				bob_balance = u64::from_be_bytes(a);
 			},
 			CallInfo {
 				exit_reason: reason,
@@ -794,7 +776,7 @@ fn test_wasm_call_evm_echo(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 		
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -804,8 +786,9 @@ fn test_wasm_call_evm_echo(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
@@ -813,7 +796,7 @@ fn test_wasm_call_evm_echo(){
 		);
 		
 		assert_ok!(creation);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
 		
@@ -907,7 +890,7 @@ fn test_evm_call_wasm_echo(){
 	.build()
 	.execute_with(|| {
 		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000);
-		let subsistence = Contracts::subsistence_threshold();
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
 		let mut a: [u8; 4] = Default::default();
@@ -917,14 +900,15 @@ fn test_evm_call_wasm_echo(){
 		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			Origin::signed(ALICE.clone()),
-			subsistence  * 10_000_000,
+			RuntimeOrigin::signed(ALICE.clone()),
+			subsistence * 100,
+			None,
 			GAS_LIMIT,
 			wasm,
 			new_call.encode(),
 			vec![],
 		);
-		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[]);
+		let wasm_addr = Contracts::contract_address(&ALICE, &wasm_code_hash, &[], &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));	
@@ -933,7 +917,7 @@ fn test_evm_call_wasm_echo(){
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
 		
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//Origin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE),
 			source,
 			evm,
 			U256::default(),
