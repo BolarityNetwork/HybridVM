@@ -303,8 +303,8 @@ fn test_wasm_call_evm(){
 				DebugInfo::Skip,
 				CollectEvents::Skip,
 				Determinism::Enforced
-			).exec_result.unwrap();
-		assert!(result.is_success());
+			).result.unwrap();
+		assert!(!result.did_revert());
 		println!("Alice transfer to Bob from wasm_call_evm:{}", transfer_value);
 		
 		//6. Get BOB balance of EVM token
@@ -408,9 +408,9 @@ fn test_evm_call_wasm(){
 				    DebugInfo::Skip,
 				    CollectEvents::Skip,
 				    Determinism::Enforced					
-				).exec_result.unwrap();
+				).result.unwrap();
 				
-		assert!(result.is_success());
+		assert!(!result.did_revert());
 		
 		//3. Create EVM contract
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
@@ -470,8 +470,8 @@ fn test_evm_call_wasm(){
 				    DebugInfo::Skip,
 				    CollectEvents::Skip,
 				    Determinism::Enforced					
-				).exec_result.unwrap();
-		assert!(result.is_success());
+				).result.unwrap();
+		assert!(!result.did_revert());
 		
 		println!("result data before:{:?}", result);
 		let bob_balance_before = result.data;
@@ -519,8 +519,8 @@ fn test_evm_call_wasm(){
 				    DebugInfo::Skip,
 				    CollectEvents::Skip,
 				    Determinism::Enforced					
-				).exec_result.unwrap();
-		assert!(result.is_success());
+				).result.unwrap();
+		assert!(!result.did_revert());
 	
 		println!("result data after:{:?}", result);
 		let bob_balance_after = result.data;		
@@ -677,9 +677,9 @@ fn test_wasm_call_evm_balance(){
 				DebugInfo::Skip,
 				CollectEvents::Skip,
 				Determinism::Enforced				
-			).exec_result.unwrap();
+			).result.unwrap();
 		println!("call wasmCallEvmBalance result:{:?}", result);	
-		assert!(result.is_success());
+		assert!(!result.did_revert());
 		assert!(result.data[0] == 0u8);
 		
 		let balance_return = <u128 as Decode>::decode(&mut &result.data[1..]).unwrap();
@@ -746,9 +746,9 @@ fn test_evm_call_wasm_balance(){
 				    DebugInfo::Skip,
 				    CollectEvents::Skip,
 				    Determinism::Enforced					
-				).exec_result.unwrap();
+				).result.unwrap();
 				
-		assert!(result.is_success());
+		assert!(!result.did_revert());
 		println!("Alice transfer to Bob wasm token:{}", token);
 		
 		//3. Create EVM contract
@@ -827,8 +827,8 @@ fn test_evm_call_wasm_balance(){
 				value: return_value,
 				..
 			} => {
-				let mut a: [u8; 16] = Default::default();
-				a.copy_from_slice(&return_value[16..32]);				
+				let mut a: [u8; 8] = Default::default();
+				a.copy_from_slice(&return_value[24..32]);				
 				bob_balance = u64::from_be_bytes(a);
 			},
 			CallInfo {
@@ -947,9 +947,9 @@ fn test_wasm_call_evm_echo(){
 				DebugInfo::Skip,
 				CollectEvents::Skip,
 				Determinism::Enforced				
-			).exec_result.unwrap();
+			).result.unwrap();
 		println!("call wasmCallEvmProxy result:{:?}", result);	
-		assert!(result.is_success());
+		assert!(!result.did_revert());
 		assert!(result.data[0] == 0u8);
 		
 		let echo_result = <String as Decode>::decode(&mut &result.data[1..]).unwrap();
