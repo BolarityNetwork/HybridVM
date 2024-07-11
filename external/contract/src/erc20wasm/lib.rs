@@ -1,4 +1,6 @@
-// Modified by 2021 Cycan Technologies for testing GVM-Bridge
+// Modified by 2024 HybridVM
+
+// Modified by 2021 Cycan Technologies 
 
 // Copyright 2018-2021 Parity Technologies (UK) Ltd.
 //
@@ -14,18 +16,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![cfg_attr(not(feature = "std"), no_std)]
+// Modified by Alex Wang
+
+#![cfg_attr(not(feature = "std"), no_std, no_main)]
 
 use ink_env::Environment;
-use ink_lang as ink;
 use ink_prelude::string::String;
 
 
-#[ink::chain_extension]
+#[ink::chain_extension( extension = 5 )]
 pub trait MyChainExtension {
         type ErrorCode = i32;
 
-        #[ink(extension = 5, handle_status = false, returns_result = false)]
+        #[ink(function = 5, handle_status = false)]
         fn call_evm_extension(vm_input: &str) -> String;
 }
 
@@ -43,7 +46,7 @@ impl Environment for CustomEnvironment {
     type Hash = <ink_env::DefaultEnvironment as Environment>::Hash;
     type BlockNumber = <ink_env::DefaultEnvironment as Environment>::BlockNumber;
     type Timestamp = <ink_env::DefaultEnvironment as Environment>::Timestamp;
-    type RentFraction = <ink_env::DefaultEnvironment as Environment>::RentFraction;
+    //type RentFraction = <ink_env::DefaultEnvironment as Environment>::RentFraction;
 
     type ChainExtension = MyChainExtension;
 }
@@ -52,20 +55,20 @@ impl Environment for CustomEnvironment {
 
 #[ink::contract(env = crate::CustomEnvironment)]
 mod erc20 {
-    #[cfg(not(feature = "ink-as-dependency"))]
-    use ink_storage::{
-        collections::HashMap as StorageHashMap,
-        lazy::Lazy,
-    };
+    //#[cfg(not(feature = "ink-as-dependency"))]
+    use ink::storage::Lazy;
+	use ink::storage::Mapping as StorageHashMap;
+	
     use ink_prelude::string::String;
     use ink_prelude::string::ToString;
 	use ink_prelude::vec::Vec;
+	
 
     /// A simple ERC-20 contract.
     #[ink(storage)]
     pub struct Erc20 {
         /// Total token supply.
-        total_supply: Lazy<Balance>,
+        total_supply: Balance,  //Lazy(Balance),
         /// Mapping from owner to number of owned token.
         balances: StorageHashMap<AccountId, Balance>,
         /// Mapping of the token amount which an account is allowed to withdraw
@@ -115,9 +118,9 @@ mod erc20 {
         pub fn new(initial_supply: Balance) -> Self {
             let caller = Self::env().caller();
             let mut balances = StorageHashMap::new();
-            balances.insert(caller, initial_supply);
+            balances.insert(caller, &initial_supply);
             let instance = Self {
-                total_supply: Lazy::new(initial_supply),
+                total_supply: initial_supply, //Lazy::new(initial_supply), //
                 balances,
                 allowances: StorageHashMap::new(),
             };
@@ -132,7 +135,7 @@ mod erc20 {
         /// Returns the total token supply.
         #[ink(message)]
         pub fn total_supply(&self) -> Balance {
-            *self.total_supply
+            self.total_supply
         }
 
         /// Returns the account balance for the specified `owner`.
@@ -140,7 +143,7 @@ mod erc20 {
         /// Returns `0` if the account is non-existent.
         #[ink(message)]
         pub fn balance_of(&self, owner: AccountId) -> Balance {
-            self.balances.get(&owner).copied().unwrap_or(0)
+            self.balances.get(&owner).unwrap_or(0)
         }
 
         /// Returns the amount which `spender` is still allowed to withdraw from `owner`.
@@ -148,7 +151,7 @@ mod erc20 {
         /// Returns `0` if no allowance has been set `0`.
         #[ink(message)]
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Balance {
-            self.allowances.get(&(owner, spender)).copied().unwrap_or(0)
+            self.allowances.get(&(owner, spender)).unwrap_or(0)
         }
 
         /// Transfers `value` amount of tokens from the caller's account to account `to`.
@@ -174,7 +177,7 @@ mod erc20 {
         #[ink(message)]
         pub fn approve(&mut self, spender: AccountId, value: Balance) -> Result<()> {
             let owner = self.env().caller();
-            self.allowances.insert((owner, spender), value);
+            self.allowances.insert((owner, spender), &value);
             self.env().emit_event(Approval {
                 owner,
                 spender,
@@ -210,7 +213,8 @@ mod erc20 {
                 return Err(Error::InsufficientAllowance)
             }
             self.transfer_from_to(from, to, value)?;
-            self.allowances.insert((from, caller), allowance - value);
+			#[allow(clippy::arithmetic_side_effects)]
+            self.allowances.insert((from, caller), &(allowance - value));
             Ok(())
         }
 
@@ -232,9 +236,11 @@ mod erc20 {
             if from_balance < value {
                 return Err(Error::InsufficientBalance)
             }
-            self.balances.insert(from, from_balance - value);
+			#[allow(clippy::arithmetic_side_effects)]
+            self.balances.insert(from, &(from_balance - value));
             let to_balance = self.balance_of(to);
-            self.balances.insert(to, to_balance + value);
+			#[allow(clippy::arithmetic_side_effects)]
+            self.balances.insert(to, &(to_balance + value));
             self.env().emit_event(Transfer {
                 from: Some(from),
                 to: Some(to),
@@ -293,6 +299,7 @@ mod erc20 {
 				None => return Err(Error::OtherError(String::from("Call EVM error, no ReturnValue!"))),
 			}
 			let result: Balance;
+			#[allow(clippy::arithmetic_side_effects)]
 			match ret[return_value_offset+16..ret.len()-3].parse::<Balance>() {
 				Ok(r) => result = r,
 				Err(e) => return Err(Error::OtherError(e.to_string())),
@@ -315,7 +322,7 @@ mod erc20 {
 			p: String,
 			u: Vec<u8>,
 		) -> (String, Vec<u8>) {
-			(p, u))
+			(p, u)
 		}
     }
 
@@ -628,9 +635,10 @@ mod erc20 {
     where
         X: scale::Encode,
     {
-        #[inline]
+        //#[inline]
         fn size_hint(&self) -> usize {
-            self.prefix.size_hint() + self.value.size_hint()
+			//#[allow(clippy::arithmetic_side_effects)]
+            self.prefix.size_hint() //+ self.value.size_hint()
         }
 
         #[inline]
