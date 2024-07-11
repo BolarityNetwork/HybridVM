@@ -128,7 +128,7 @@ fn test_wasm_call_evm(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
@@ -374,7 +374,7 @@ fn test_evm_call_wasm(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
@@ -395,7 +395,7 @@ fn test_evm_call_wasm(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);		
 		let transfer_call = ExecutionInput::new( Selector::new(a) );
 		
-		let token: <Test as pallet_balances::Config>::Balance  = 1_213_000_789_000_000;		
+		let token: <Test as pallet_balances::Config>::Balance  = 1_213_000_789_000_000_000_000;		
 		let transfer_call = transfer_call.push_arg(&BOB).push_arg(token);
 		
 		let result = Contracts::bare_call(
@@ -552,7 +552,7 @@ fn test_wasm_call_evm_balance(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
@@ -712,7 +712,7 @@ fn test_evm_call_wasm_balance(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
@@ -733,7 +733,7 @@ fn test_evm_call_wasm_balance(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);		
 		let transfer_call = ExecutionInput::new( Selector::new(a) );
 		
-		let token: <Test as pallet_balances::Config>::Balance  = 1_213_000_789_000_000;		
+		let token: <Test as pallet_balances::Config>::Balance  = 1_213_000_789_000_000_000_000;		
 		let transfer_call = transfer_call.push_arg(&BOB).push_arg(token);
 		
 		let result = Contracts::bare_call(
@@ -820,16 +820,16 @@ fn test_evm_call_wasm_balance(){
 						
 		println!("call evmCallWasmBalance reuslt:{:?}", call4evm);
 		
-		let bob_balance: u64;
+		let bob_balance: u128;
 		match call4evm.unwrap() {
 			CallInfo {
 				exit_reason: ExitReason::Succeed(_),
 				value: return_value,
 				..
 			} => {
-				let mut a: [u8; 8] = Default::default();
-				a.copy_from_slice(&return_value[24..32]);				
-				bob_balance = u64::from_be_bytes(a);
+				let mut a: [u8; 16] = Default::default();
+				a.copy_from_slice(&return_value[16..32]);				
+				bob_balance = u128::from_be_bytes(a);
 			},
 			CallInfo {
 				exit_reason: reason,
@@ -868,7 +868,7 @@ fn test_wasm_call_evm_echo(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
@@ -992,7 +992,7 @@ fn test_evm_call_wasm_echo(){
 		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);		
 		let new_call = ExecutionInput::new( Selector::new(a) );
 	
-		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000;
+		let init_supply: <Test as pallet_balances::Config>::Balance  = 100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),

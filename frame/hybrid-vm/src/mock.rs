@@ -21,7 +21,7 @@ use frame_support::{
 	derive_impl,
 	dispatch::DispatchClass,
 	parameter_types,
-	traits::{ConstU32, ConstU64, FindAuthor, Get},
+	traits::{ConstU32, ConstU64, ConstU128, FindAuthor, Get},
 	weights::Weight,
 };
 use sp_core::{crypto::{AccountId32, UncheckedFrom}, ConstBool, H256, U256};
@@ -43,7 +43,7 @@ use pallet_contracts::chain_extension::SysConfig;
 use crate as pallet_Hybrid_vm;
 
 type Block = frame_system::mocking::MockBlock<Test>;
-pub type Balance = u64;
+pub type Balance = u128;
 
 frame_support::construct_runtime!(
 	pub enum Test {
@@ -99,7 +99,7 @@ impl frame_system::Config for Test {
 	type BlockHashCount = ConstU64<250>;
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<u128>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -110,7 +110,8 @@ impl frame_system::Config for Test {
 
 #[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
-	type ExistentialDeposit = ConstU64<1>;
+	type Balance = Balance;
+	type ExistentialDeposit = ConstU128<1>;
 	type ReserveIdentifier = [u8; 8];
     type AccountStore = System;
 }
@@ -241,7 +242,7 @@ impl pallet_evm::Config for Test {
 
 impl Convert<Weight, BalanceOf<Self>> for Test {
 	fn convert(w: Weight) -> BalanceOf<Self> {
-		w.ref_time()
+		w.ref_time().into()
 	}
 }
 
@@ -271,8 +272,8 @@ impl frame_support::traits::Contains<RuntimeCall> for AllowBalancesCall {
 }
 
 // Unit = the base number of indivisible units for balances
-const UNIT: Balance = 1_000_000_000_000_000_000;
-const MILLIUNIT: Balance = 1_000_000_000_000_000;
+const UNIT: Balance = 1_000_000_000_000;
+const MILLIUNIT: Balance = 1_000_000_000;
 
 const fn deposit(items: u32, bytes: u32) -> Balance {
 	(items as Balance * UNIT + (bytes as Balance) * (5 * MILLIUNIT / 100)) / 10
@@ -317,10 +318,10 @@ where
 }
 
 parameter_types! {
-	pub const DepositPerItem: Balance = deposit(1, 0);
-	pub const DepositPerByte: Balance = deposit(0, 1);
+	pub const DepositPerItem: u64 = deposit(1, 0) as u64;
+	pub const DepositPerByte: u64 = deposit(0, 1) as u64;
 	pub Schedule: pallet_contracts::Schedule<Test> = schedule::<Test>();
-	pub const DefaultDepositLimit: Balance = deposit(1024, 1024 * 1024);
+	pub const DefaultDepositLimit: u64 = deposit(1024, 1024 * 1024) as u64;
 	pub const CodeHashLockupDepositPercent: Perbill = Perbill::from_percent(0);
 	pub const MaxDelegateDependencies: u32 = 32;
 }
