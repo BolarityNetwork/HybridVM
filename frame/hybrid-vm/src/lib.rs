@@ -1,5 +1,5 @@
-// Copyright (C) HybirdVM.
-// This file is part of HybirdVM.
+// Copyright (C) HybridVM.
+// This file is part of HybridVM.
 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -65,7 +65,7 @@ pub mod pallet {
 	pub enum Event<T: Config> {
 		EVMExecuted(H160),
 		WasmVMExecuted(T::AccountId),
-		HybirdVMCalled(T::AccountId),
+		HybridVMCalled(T::AccountId),
 	}
 
 	#[pallet::error]
@@ -82,14 +82,14 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn call_hybird_vm(
+		pub fn call_Hybrid_vm(
 			origin: OriginFor<T>,
 			_transaction: Transaction,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			// Todo 
-			Self::deposit_event(Event::HybirdVMCalled(who));
+			Self::deposit_event(Event::HybridVMCalled(who));
 			
 			Ok(().into())
 		}

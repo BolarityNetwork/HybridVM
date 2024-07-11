@@ -16,8 +16,8 @@ overflow-checks = true
 [workspace]
 members = [
     "primitives/system",
-	"frame/hybird-vm",
-	"frame/evm-precompile/call-hybird-vm",
+	"frame/Hybrid-vm",
+	"frame/evm-precompile/call-Hybrid-vm",
 ]
 resolver = "2"
 
