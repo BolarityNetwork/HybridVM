@@ -132,8 +132,8 @@ fn test_wasm_call_evm(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
@@ -153,7 +153,13 @@ fn test_wasm_call_evm(){
 			U256::default(),
 			100_000_000_000,
 			Some(U256::default()),
+			None,
 			Some(U256::from(0)),
+			Vec::new(),
+			true,
+			true,
+			None,
+			None,
 			<Test as pallet_evm::Config>::config(),
 		);
 		
@@ -350,8 +356,8 @@ fn test_evm_call_wasm(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
@@ -504,8 +510,8 @@ fn test_wasm_call_evm_balance(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
@@ -648,8 +654,8 @@ fn test_evm_call_wasm_balance(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
@@ -788,8 +794,8 @@ fn test_wasm_call_evm_echo(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
@@ -902,8 +908,8 @@ fn test_evm_call_wasm_echo(){
 		let creation = Contracts::instantiate_with_code(
 			RuntimeOrigin::signed(ALICE.clone()),
 			subsistence * 100,
-			None,
 			GAS_LIMIT,
+			None,
 			wasm,
 			new_call.encode(),
 			vec![],
