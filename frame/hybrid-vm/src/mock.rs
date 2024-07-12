@@ -358,10 +358,17 @@ impl pallet_contracts::Config for Test {
 	
 }
 
+pub struct GasPrice;
+impl Get<Option<U256>> for GasPrice {
+	fn get() -> Option<U256> {
+		Some(U256::from(100_000_000_000u64))
+	}
+}
 
 parameter_types! {
 	pub const EnableCallEVM: bool = true;
 	pub const EnableCallWasmVM: bool = true;
+	pub const GasLimit: u64 = 10_000_000u64;
 }
 
 impl pallet_Hybrid_vm::Config for Test {
@@ -369,6 +376,8 @@ impl pallet_Hybrid_vm::Config for Test {
 	type Currency = Balances;
 	type EnableCallEVM = EnableCallEVM;
 	type EnableCallWasmVM = EnableCallWasmVM;
+	type GasLimit = GasLimit;
+	type GasPrice = GasPrice;
 }
 
 const A:[u8; 32] = [1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 0,0,0,0,0, 0,0,0,0,0, 0,0];

@@ -150,8 +150,8 @@ where
 		source_arr[0..32].copy_from_slice(caller_accountid.as_byte_slice());
 		let source = H160::from_slice(&source_arr[0..20]);
 		
-		let mut envbuf = env.buf_in_buf_out();
-		let input0:Vec<u8> = envbuf.read_as_unbounded(1_000_000)?;
+		let mut envbuf = env.buf_in_buf_out();	
+		let input0: Vec<u8> = envbuf.read_as_unbounded(envbuf.in_len())?;	
 		
 		let input: Vec<u8>;
 		let target: H160;
@@ -168,8 +168,8 @@ where
 			target,
 			input,
 			U256::default(),
-			100_000_000_000,
-			Some(U256::default()),
+			C::GasLimit::get(),
+			C::GasPrice::get(),
 			None,
 			Some(pallet_evm::Pallet::<C>::account_basic(&source).0.nonce),
 			Vec::new(),

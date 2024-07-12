@@ -4,9 +4,6 @@ version = "5.0.0"
 authors = ["Parity Technologies <admin@parity.io> and modified by HybridVM"]
 edition = "2021"
 
-[profile.release]
-overflow-checks = false
-
 [dependencies]
 ink_primitives = { version = "5.0.0", git = "https://github.com/paritytech/ink", default-features = false }
 ink_metadata = { version = "5.0.0", git = "https://github.com/paritytech/ink", default-features = false, features = ["derive"], optional = true }
@@ -18,6 +15,8 @@ ink_prelude = { version = "5.0.0", git = "https://github.com/paritytech/ink", de
 scale = { package = "parity-scale-codec", version = "3.6.4", default-features = false, features = ["derive"] }
 scale-info = { version = "0.6", default-features = false, features = ["derive"], optional = true }
 primitive-types = { version = "0.9.0", default-features = false, features = ["codec"] }
+
+sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.11.0", default-features = false }
 
 [lib]
 name = "erc20"
@@ -37,6 +36,7 @@ std = [
     "scale-info",
     "scale-info/std",
     "primitive-types/std",
+	"sp-std/std",
 ]
 ink-as-dependency = []
 #ink-experimental-engine = ["ink_env/ink-experimental-engine"]

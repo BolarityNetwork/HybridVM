@@ -27,7 +27,7 @@ use frame_support::traits::{
 	Currency, Get,
 };
 use frame_support::sp_runtime::AccountId32;
-use sp_core::H160;
+use sp_core::{H160, U256};
 use sp_std::vec::Vec;
 use ethereum::TransactionV2 as Transaction;
 use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
@@ -54,7 +54,13 @@ pub mod pallet {
 		type EnableCallEVM: Get<bool>;
 		
 		#[pallet::constant]
-		type EnableCallWasmVM: Get<bool>;		
+		type EnableCallWasmVM: Get<bool>;	
+		
+		#[pallet::constant]
+		type GasLimit: Get<u64>;
+		
+		#[pallet::constant]
+		type GasPrice: Get<Option<U256>>;	
 	}
 
 	#[pallet::pallet]

@@ -22,14 +22,14 @@
 
 use ink_env::Environment;
 use ink_prelude::string::String;
+use sp_std::vec::Vec;
 
-
-#[ink::chain_extension( extension = 5 )]
+#[ink::chain_extension( extension = 0 )]
 pub trait MyChainExtension {
         type ErrorCode = i32;
 
         #[ink(function = 5, handle_status = false)]
-        fn call_evm_extension(vm_input: &str) -> String;
+        fn call_evm_extension(vm_input: Vec<u8>) -> String;
 }
 
 
@@ -114,7 +114,7 @@ mod erc20 {
 
     impl Erc20 {
         /// Creates a new ERC-20 contract with the specified initial supply.
-        #[ink(constructor)]
+        #[ink(constructor, payable)]
         pub fn new(initial_supply: Balance) -> Self {
             let caller = Self::env().caller();
             let mut balances = StorageHashMap::new();
@@ -124,12 +124,12 @@ mod erc20 {
                 balances,
                 allowances: StorageHashMap::new(),
             };
-            Self::env().emit_event(Transfer {
+			Self::env().emit_event(Transfer {
                 from: None,
                 to: Some(caller),
                 value: initial_supply,
             });
-            instance
+			instance
         }
 
         /// Returns the total token supply.
@@ -270,7 +270,7 @@ mod erc20 {
 			//input = '{"VM":"evm", "Account":"0x' + acnt.to_string() + '", "Fun":"transfer(address,uint256)", "InputType":["address","uint"], 
 			//"InputValue":["0x' + to.to_string() +'", "' + value.to_string() + '"],  "OutputType":[["bool"]]}';
 			
-            let ret = self.env().extension().call_evm_extension(&input);
+            let ret = self.env().extension().call_evm_extension(input.as_bytes().to_vec());
             Ok(ret)
         }
 
@@ -292,7 +292,7 @@ mod erc20 {
 			//input = '{"VM":"evm", "Account":"0x' + acnt.to_string() + '", "Fun":"balanceOf(address)", "InputType":["address"], 
 			//"InputValue":["0x' + to.to_string()"],  "OutputType":[["uint"]]}';
 			
-            let ret = self.env().extension().call_evm_extension(&input);
+            let ret = self.env().extension().call_evm_extension(input.as_bytes().to_vec());
 			let return_value_offset: usize;
 			match ret.find(r#""ReturnValue":[""#) {
 				Some(r) => return_value_offset = r,
@@ -313,7 +313,7 @@ mod erc20 {
             &mut self,
             data: String,
         ) -> Result<String> {
-            Ok(self.env().extension().call_evm_extension(&data))
+            Ok(self.env().extension().call_evm_extension(data.as_bytes().to_vec()))
         }	
 
 		#[ink(message)]
@@ -635,10 +635,9 @@ mod erc20 {
     where
         X: scale::Encode,
     {
-        //#[inline]
+        #[inline]
         fn size_hint(&self) -> usize {
-			//#[allow(clippy::arithmetic_side_effects)]
-            self.prefix.size_hint() //+ self.value.size_hint()
+            self.prefix.size_hint().checked_add(self.value.size_hint()).unwrap()
         }
 
         #[inline]
