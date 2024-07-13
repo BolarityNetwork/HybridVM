@@ -46,6 +46,7 @@ use pallet_evm::{Runner, ExitReason, CallInfo, CreateInfo, };
 use std::error::Error;
 use serde::{Deserialize, Serialize};
 
+
 #[derive(Deserialize, Encode, Decode, Serialize, Debug)]
 #[allow(non_snake_case)]
 struct CallReturn  {
@@ -529,8 +530,8 @@ fn test_evm_call_wasm(){
 		let bob_balance_after = result.data;		
 				
 		//7. Test  the balance of BOB being correct
-		let after = <u128 as Decode>::decode(&mut &bob_balance_after[..]).unwrap();
-		let before = <u128 as Decode>::decode(&mut &bob_balance_before[..]).unwrap();
+		let after = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_after[..]).unwrap().unwrap();
+		let before = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_before[..]).unwrap().unwrap();
 		assert_eq!(after, before + transfer_value);	
 	});
 }
@@ -686,7 +687,7 @@ fn test_wasm_call_evm_balance(){
 		assert!(!result.did_revert());
 		assert!(result.data[0] == 0u8);
 		
-		let balance_return = <u128 as Decode>::decode(&mut &result.data[1..]).unwrap();
+		let balance_return = <Result<Result<u128,u8>, u8> as Decode>::decode(&mut &result.data[..]).unwrap().unwrap().unwrap();
 		println!("BOB's  evm token balance:{:?}", balance_return);
 		
 		//5. Test  the evm token balance of BOB being correct 
@@ -958,7 +959,7 @@ fn test_wasm_call_evm_echo(){
 		assert!(!result.did_revert());
 		assert!(result.data[0] == 0u8);
 		
-		let echo_result = <String as Decode>::decode(&mut &result.data[1..]).unwrap();
+		let echo_result = <Result<Result<String, u8>, u8> as Decode>::decode(&mut &result.data[..]).unwrap().unwrap().unwrap();
 		println!("Evm echo return:{:?}", echo_result);
 		let call_return: CallReturn = serde_json::from_slice(echo_result.as_bytes()).unwrap();
 		let echo_string = (call_return.ReturnValue[0]).parse::<String>().unwrap();
@@ -1114,7 +1115,7 @@ fn test_evm_call_wasm_echo(){
 				value: _,
 				..			
 			} => {
-				panic!("Call EVM Contract fun evmCallWasmBalance failed!({:?})", reason);
+				panic!("Call EVM Contract fun evmCallWasmProxy failed!({:?})", reason);
 			},
 		};		
 		

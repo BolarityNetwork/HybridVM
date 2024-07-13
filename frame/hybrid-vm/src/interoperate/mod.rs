@@ -120,7 +120,8 @@ where
 		match info.result {
 			Ok(return_value) => {
 				if !return_value.did_revert() {
-					output = vm_codec::wasm_decode(&data[32..].iter().cloned().collect(), &return_value.data, true, "");
+					// because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
+					output = vm_codec::wasm_decode(&data[32..].iter().cloned().collect(), &return_value.data[1..].iter().cloned().collect(), true, "");
 				} else {
 					return Err(DispatchError::from("Call wasm contract failed(REVERT)"));
 				}
