@@ -13,32 +13,34 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 use super::*;
 
+use fp_evm::Precompile;
+use frame_support::pallet_prelude::*;
 use frame_support::{
-	ConsensusEngineId,
 	derive_impl,
 	dispatch::DispatchClass,
 	parameter_types,
-	traits::{ConstU32, ConstU64, ConstU128, FindAuthor, Get},
+	traits::{ConstU128, ConstU32, ConstU64, FindAuthor, Get},
 	weights::Weight,
+	ConsensusEngineId,
 };
-use sp_core::{crypto::{AccountId32, UncheckedFrom}, ConstBool, H256, U256};
+use frame_system::pallet_prelude::*;
+use hp_system::EvmHybridVMExtension;
+use pallet_contracts::chain_extension::SysConfig;
+use pallet_evm::{
+	AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
+	IsPrecompileResult, PrecompileHandle, PrecompileResult, PrecompileSet,
+};
+use pallet_evm_precompile_simple::{ECRecover, Identity, Ripemd160, Sha256};
+use sp_core::{
+	crypto::{AccountId32, UncheckedFrom},
+	ConstBool, H256, U256,
+};
 use sp_runtime::{
-	traits::{Convert, BlakeTwo256, IdentityLookup},
+	traits::{BlakeTwo256, Convert, IdentityLookup},
 	BuildStorage, Perbill,
 };
-use hp_system::EvmHybridVMExtension;
-use frame_system::pallet_prelude::*;
-use frame_support::pallet_prelude::*;
-use fp_evm::Precompile;
-use pallet_evm_precompile_simple::{ECRecover, Identity, Ripemd160, Sha256};
-use pallet_evm::{
-	    AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
-		IsPrecompileResult, PrecompileHandle, PrecompileResult, PrecompileSet,
-	};
-use pallet_contracts::chain_extension::SysConfig;
 
 use crate as pallet_Hybrid_vm;
 
@@ -113,7 +115,7 @@ impl pallet_balances::Config for Test {
 	type Balance = Balance;
 	type ExistentialDeposit = ConstU128<1>;
 	type ReserveIdentifier = [u8; 8];
-    type AccountStore = System;
+	type AccountStore = System;
 }
 
 parameter_types! {
@@ -127,18 +129,22 @@ impl pallet_timestamp::Config for Test {
 	type WeightInfo = ();
 }
 
-
-impl hp_system::EvmHybridVMExtension<Test> for Test{
+impl hp_system::EvmHybridVMExtension<Test> for Test {
 	fn call_hybrid_vm(
 		origin: OriginFor<Test>,
 		data: Vec<u8>,
-		target_gas: Option<u64>
-		) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>
-	{
-		let target_weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(target_gas.unwrap_or(0), false);
+		target_gas: Option<u64>,
+	) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError> {
+		let target_weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(
+			target_gas.unwrap_or(0),
+			false,
+		);
 		let (result_output, result_weight) = HybridVM::call_wasm4evm(origin, data, target_weight)?;
-		
-		Ok((result_output, <Test as pallet_evm::Config>::GasWeightMapping::weight_to_gas(result_weight)))
+
+		Ok((
+			result_output,
+			<Test as pallet_evm::Config>::GasWeightMapping::weight_to_gas(result_weight),
+		))
 	}
 }
 
@@ -148,9 +154,9 @@ fn hash(a: u64) -> H160 {
 
 pub struct MockPrecompileSet<T>(PhantomData<T>);
 
-impl<T> PrecompileSet for MockPrecompileSet<T> 
+impl<T> PrecompileSet for MockPrecompileSet<T>
 where
-     T: pallet_evm::Config + EvmHybridVMExtension<T>,
+	T: pallet_evm::Config + EvmHybridVMExtension<T>,
 {
 	fn execute(&self, handle: &mut impl PrecompileHandle) -> Option<PrecompileResult> {
 		match handle.code_address() {
@@ -159,11 +165,13 @@ where
 			a if a == hash(2) => Some(Sha256::execute(handle)),
 			a if a == hash(3) => Some(Ripemd160::execute(handle)),
 			a if a == hash(4) => Some(Identity::execute(handle)),
-			a if a == hash(5) => Some(pallet_evm_precompile_call_hybrid_vm::CallHybridVM::<T>::execute(handle)),
+			a if a == hash(5) => {
+				Some(pallet_evm_precompile_call_hybrid_vm::CallHybridVM::<T>::execute(handle))
+			},
 			_ => None,
 		}
 	}
-	
+
 	fn is_precompile(&self, address: H160, _gas: u64) -> IsPrecompileResult {
 		IsPrecompileResult::Answer {
 			is_precompile: [hash(1), hash(2), hash(3), hash(4), hash(5)].contains(&address),
@@ -175,7 +183,7 @@ where
 pub struct CompactAddressMapping;
 
 impl AddressMapping<AccountId32> for CompactAddressMapping {
-	fn into_account_id(address: H160) ->  AccountId32 {	
+	fn into_account_id(address: H160) -> AccountId32 {
 		let mut data = [0u8; 32];
 		data[0..20].copy_from_slice(&address[..]);
 		AccountId32::from(data)
@@ -196,8 +204,8 @@ impl FindAuthor<H160> for FindAuthorTruncated {
 	where
 		I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
 	{
-		let a:[u8; 20] = [12,34,45,0,0, 0,0,0,0,0, 0,0,0,0,0, 0,0,0,0,0];
-		
+		let a: [u8; 20] = [12, 34, 45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
 		Some(H160::from(a))
 	}
 }
@@ -249,16 +257,16 @@ impl Convert<Weight, BalanceOf<Self>> for Test {
 #[derive(Default)]
 pub struct HybridVMChainExtension;
 
-impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainExtension{
-    fn call<E>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
+impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainExtension {
+	fn call<E>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
 	where
 		E: Ext<T = Test>,
-		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>
+		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
 	{
 		let func_id = env.func_id();
 		match func_id {
 			5 => HybridVM::call_evm4wasm::<E>(env),
-			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),			
+			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),
 		}
 	}
 }
@@ -305,7 +313,7 @@ where
 	fn try_origin(o: T::RuntimeOrigin) -> Result<Self::Success, T::RuntimeOrigin> {
 		let who = <frame_system::EnsureSigned<_> as EnsureOrigin<_>>::try_origin(o.clone())?;
 		if matches!(A::get(), Some(a) if who != a.clone().into()) {
-			return Err(o)
+			return Err(o);
 		}
 
 		Ok(who)
@@ -350,12 +358,11 @@ impl pallet_contracts::Config for Test {
 	type MaxDelegateDependencies = MaxDelegateDependencies;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type UploadOrigin = EnsureAccount<Self, UploadAccount>;
-	type InstantiateOrigin = EnsureAccount<Self, InstantiateAccount>;	
+	type InstantiateOrigin = EnsureAccount<Self, InstantiateAccount>;
 	type Environment = ();
 	type Debug = ();
 	type Migrations = ();
 	type Xcm = ();
-	
 }
 
 pub struct GasPrice;
@@ -380,8 +387,12 @@ impl pallet_Hybrid_vm::Config for Test {
 	type GasPrice = GasPrice;
 }
 
-const A:[u8; 32] = [1,1,1,1,1, 2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 0,0,0,0,0, 0,0,0,0,0, 0,0];
-const B:[u8; 32] = [2,2,2,2,2, 3,3,3,3,3, 4,4,4,4,4, 5,5,5,5,5, 0,0,0,0,0, 0,0,0,0,0, 0,0];
+const A: [u8; 32] = [
+	1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+const B: [u8; 32] = [
+	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
 pub const ALICE: AccountId32 = AccountId32::new(A);
 pub const BOB: AccountId32 = AccountId32::new(B);
 
@@ -412,7 +423,9 @@ impl ExtBuilder {
 		pallet_evm::GenesisConfig::<Test> {
 			accounts: std::collections::BTreeMap::new(),
 			_marker: PhantomData,
-		}.assimilate_storage(&mut t).unwrap();			
+		}
+		.assimilate_storage(&mut t)
+		.unwrap();
 		let mut ext = sp_io::TestExternalities::new(t);
 		ext.execute_with(|| System::set_block_number(1));
 		ext

@@ -15,13 +15,13 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use sp_std::vec::Vec;
 use frame_system::pallet_prelude::*;
+use sp_std::vec::Vec;
 
 pub trait EvmHybridVMExtension<C: frame_system::Config> {
 	fn call_hybrid_vm(
-			origin: OriginFor<C>,
-			data: Vec<u8>,
-			target_gas: Option<u64>
-		) -> Result<(Vec<u8>, u64),sp_runtime::DispatchError>;
+		origin: OriginFor<C>,
+		data: Vec<u8>,
+		target_gas: Option<u64>,
+	) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>;
 }

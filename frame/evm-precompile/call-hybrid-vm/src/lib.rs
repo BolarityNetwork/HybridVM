@@ -18,29 +18,31 @@
 use core::marker::PhantomData;
 use fp_evm::{ExitError, ExitSucceed, Precompile, PrecompileFailure};
 use fp_evm::{PrecompileHandle, PrecompileOutput, PrecompileResult};
-use pallet_evm::AddressMapping;
 use frame_system::RawOrigin;
 use hp_system::EvmHybridVMExtension;
+use pallet_evm::AddressMapping;
 
 pub struct CallHybridVM<T> {
 	_marker: PhantomData<T>,
 }
 
-impl<T> Precompile for CallHybridVM<T> where
+impl<T> Precompile for CallHybridVM<T>
+where
 	T: pallet_evm::Config + EvmHybridVMExtension<T>,
 {
 	fn execute(handle: &mut impl PrecompileHandle) -> PrecompileResult {
 		let context = handle.context();
 		let target_gas = handle.gas_limit();
 		let origin = RawOrigin::from(Some(T::AddressMapping::into_account_id(context.caller)));
-		
-		match T::call_hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas) {
-			Ok(ret) => Ok(PrecompileOutput{exit_status:ExitSucceed::Returned, output:ret.0}),
+
+		match T::call_hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas)
+		{
+			Ok(ret) => Ok(PrecompileOutput { exit_status: ExitSucceed::Returned, output: ret.0 }),
 			Err(e) => {
-				let err_str:&'static str = e.into();
-				
-				Err(PrecompileFailure::Error {exit_status: ExitError::Other(err_str.into()),}) 
+				let err_str: &'static str = e.into();
+
+				Err(PrecompileFailure::Error { exit_status: ExitError::Other(err_str.into()) })
 			},
-		}				
+		}
 	}
 }
