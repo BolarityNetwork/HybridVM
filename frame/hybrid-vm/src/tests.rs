@@ -108,8 +108,8 @@ fn test_wasm_call_evm() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -121,7 +121,7 @@ fn test_wasm_call_evm() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -132,12 +132,12 @@ fn test_wasm_call_evm() {
 
 		assert_ok!(creation);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
 		//3. Create EVM contract  and tranfer to bob token
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
 			source,
@@ -171,7 +171,7 @@ fn test_wasm_call_evm() {
 		//3.1 Alice tranfer token to  Bob
 		let transfer_selector = &Keccak256::digest(b"transfer(address,uint256)")[0..4];
 
-		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB)[0..20]));
+		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW)[0..20]));
 		let token: u128 = 1_883_000_000_000_000_000;
 
 		let fun_para: [u8; 20] = source_bob.into();
@@ -212,10 +212,10 @@ fn test_wasm_call_evm() {
 		};
 		println!("Alice transfer to Bob token:{}", transfer_result);
 
-		//4. Get BOB balance of EVM token
+		//4. Get BOB_SHADOW balance of EVM token
 		let balance_of_selector = &Keccak256::digest(b"balanceOf(address)")[0..4];
 
-		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB)[0..20]));
+		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW)[0..20]));
 
 		let fun_para: [u8; 20] = source_bob.into();
 		let balance_of_input = [&balance_of_selector[..], &[0u8; 12], &fun_para].concat();
@@ -266,7 +266,7 @@ fn test_wasm_call_evm() {
 			.push_arg(transfer_value);
 
 		let result = Contracts::bare_call(
-			ALICE,
+			ALICE_SHADOW,
 			wasm_addr,
 			0,
 			WEIGHT_LIMIT,
@@ -281,7 +281,7 @@ fn test_wasm_call_evm() {
 		assert!(!result.did_revert());
 		println!("Alice transfer to Bob from wasm_call_evm:{}", transfer_value);
 
-		//6. Get BOB balance of EVM token
+		//6. Get BOB_SHADOW balance of EVM token
 		let call4evm = <Test as pallet_evm::Config>::Runner::call(
 			source_bob,
 			evm_addr,
@@ -314,7 +314,7 @@ fn test_wasm_call_evm() {
 			},
 		};
 		println!("bob_balance_after={}", bob_balance_after);
-		//7. Test  the balance of BOB being correct
+		//7. Test  the balance of BOB_SHADOW being correct
 		assert_eq!(bob_balance_after, bob_balance_before + transfer_value);
 	});
 }
@@ -327,8 +327,8 @@ fn test_evm_call_wasm() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -340,7 +340,7 @@ fn test_evm_call_wasm() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -349,21 +349,21 @@ fn test_evm_call_wasm() {
 			vec![],
 		);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//2.1 Transfer Token to BOB
+		//2.1 Transfer Token to BOB_SHADOW
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);
 		let transfer_call = ExecutionInput::new(Selector::new(a));
 
 		let token: <Test as pallet_balances::Config>::Balance = 1_213_000_789_000_000_000_000;
-		let transfer_call = transfer_call.push_arg(&BOB).push_arg(token);
+		let transfer_call = transfer_call.push_arg(&BOB_SHADOW).push_arg(token);
 
 		let result = Contracts::bare_call(
-			ALICE.clone(),
+			ALICE_SHADOW.clone(),
 			wasm_addr.clone(),
 			0,
 			WEIGHT_LIMIT,
@@ -379,10 +379,10 @@ fn test_evm_call_wasm() {
 		assert!(!result.did_revert());
 
 		//3. Create EVM contract
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//RuntimeOrigin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE_SHADOW),
 			source,
 			evm,
 			U256::default(),
@@ -410,15 +410,15 @@ fn test_evm_call_wasm() {
 			},
 		}
 
-		//4. Get BOB balance of wasm token
+		//4. Get BOB_SHADOW balance of wasm token
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"balance_of")[0..4]);
 		let balance_of_call = ExecutionInput::new(Selector::new(a));
 
-		let balance_of_call = balance_of_call.push_arg(&BOB);
+		let balance_of_call = balance_of_call.push_arg(&BOB_SHADOW);
 
 		let result = Contracts::bare_call(
-			BOB.clone(),
+			BOB_SHADOW.clone(),
 			wasm_addr.clone(),
 			0,
 			WEIGHT_LIMIT,
@@ -446,14 +446,14 @@ fn test_evm_call_wasm() {
 
 		let evm_call_wasm_input = [
 			&evm_call_wasm_selector[..],
-			AsRef::<[u8; 32]>::as_ref(&BOB),
+			AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW),
 			&[0u8; 16],
 			&transfer_value.to_be_bytes(),
 			&wasm_contract,
 		]
 		.concat();
 
-		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let call4evm = <Test as pallet_evm::Config>::Runner::call(
 			source_alice,
@@ -475,9 +475,9 @@ fn test_evm_call_wasm() {
 		assert!(&call4evm.unwrap().exit_reason.is_succeed());
 		println!("Alice transfer to Bob from evm_call_wasm:{}", transfer_value);
 
-		//6. Get BOB balance of wasm token
+		//6. Get BOB_SHADOW balance of wasm token
 		let result = Contracts::bare_call(
-			BOB.clone(),
+			BOB_SHADOW.clone(),
 			wasm_addr.clone(),
 			0,
 			WEIGHT_LIMIT,
@@ -494,7 +494,7 @@ fn test_evm_call_wasm() {
 		println!("result data after:{:?}", result);
 		let bob_balance_after = result.data;
 
-		//7. Test  the balance of BOB being correct
+		//7. Test  the balance of BOB_SHADOW being correct
 		let after = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_after[..])
 			.unwrap()
 			.unwrap();
@@ -513,8 +513,8 @@ fn test_wasm_call_evm_balance() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -526,7 +526,7 @@ fn test_wasm_call_evm_balance() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -537,12 +537,12 @@ fn test_wasm_call_evm_balance() {
 
 		assert_ok!(creation);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
 		//3. Create EVM contract  and tranfer to bob token
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
 			source,
@@ -576,7 +576,7 @@ fn test_wasm_call_evm_balance() {
 		//3.1 Alice tranfer token to  Bob
 		let transfer_selector = &Keccak256::digest(b"transfer(address,uint256)")[0..4];
 
-		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB)[0..20]));
+		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW)[0..20]));
 		let token: u128 = 1_883_000_000_000_000_000;
 
 		let fun_para: [u8; 20] = source_bob.into();
@@ -618,7 +618,7 @@ fn test_wasm_call_evm_balance() {
 
 		println!("Alice transfer to Bob evm result:{}, tokens:{}", transfer_result, token);
 
-		//4.  Call wasm contract to call evm for getting BOB balance of EVM token.  H160: evm contract address, H160: BOB's address
+		//4.  Call wasm contract to call evm for getting BOB_SHADOW balance of EVM token.  H160: evm contract address, H160: BOB_SHADOW's address
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"wasmCallEvmBalance")[0..4]);
 		let call = ExecutionInput::new(Selector::new(a));
@@ -628,7 +628,7 @@ fn test_wasm_call_evm_balance() {
 			.push_arg(format!("0x{:x}", source_bob));
 
 		let result = Contracts::bare_call(
-			ALICE,
+			ALICE_SHADOW,
 			wasm_addr,
 			0,
 			WEIGHT_LIMIT,
@@ -649,9 +649,9 @@ fn test_wasm_call_evm_balance() {
 				.unwrap()
 				.unwrap()
 				.unwrap();
-		println!("BOB's  evm token balance:{:?}", balance_return);
+		println!("BOB_SHADOW's  evm token balance:{:?}", balance_return);
 
-		//5. Test  the evm token balance of BOB being correct
+		//5. Test  the evm token balance of BOB_SHADOW being correct
 		assert_eq!(balance_return, token);
 	});
 }
@@ -664,8 +664,8 @@ fn test_evm_call_wasm_balance() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -677,7 +677,7 @@ fn test_evm_call_wasm_balance() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -686,21 +686,21 @@ fn test_evm_call_wasm_balance() {
 			vec![],
 		);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//2.1 Transfer Token to BOB
+		//2.1 Transfer Token to BOB_SHADOW
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);
 		let transfer_call = ExecutionInput::new(Selector::new(a));
 
 		let token: <Test as pallet_balances::Config>::Balance = 1_213_000_789_000_000_000_000;
-		let transfer_call = transfer_call.push_arg(&BOB).push_arg(token);
+		let transfer_call = transfer_call.push_arg(&BOB_SHADOW).push_arg(token);
 
 		let result = Contracts::bare_call(
-			ALICE.clone(),
+			ALICE_SHADOW.clone(),
 			wasm_addr.clone(),
 			0,
 			WEIGHT_LIMIT,
@@ -717,10 +717,10 @@ fn test_evm_call_wasm_balance() {
 		println!("Alice transfer to Bob wasm token:{}", token);
 
 		//3. Create EVM contract
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//RuntimeOrigin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE_SHADOW),
 			source,
 			evm,
 			U256::default(),
@@ -748,16 +748,16 @@ fn test_evm_call_wasm_balance() {
 			},
 		}
 
-		//4.  Call evm contract to call wasm for getting BOB balance of wasm token.  H160: BOB's address , the last bytes32 is the wasm contract accountid
+		//4.  Call evm contract to call wasm for getting BOB_SHADOW balance of wasm token.  H160: BOB_SHADOW's address , the last bytes32 is the wasm contract accountid
 		let evm_call_wasm_selector =
 			&Keccak256::digest(b"evmCallWasmBalance(bytes32,bytes32)")[0..4];
 
 		let wasm_contract: [u8; 32] = wasm_addr.clone().into();
 
 		let evm_call_wasm_input =
-			[&evm_call_wasm_selector[..], AsRef::<[u8; 32]>::as_ref(&BOB), &wasm_contract].concat();
+			[&evm_call_wasm_selector[..], AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW), &wasm_contract].concat();
 
-		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let call4evm = <Test as pallet_evm::Config>::Runner::call(
 			source_alice,
@@ -791,9 +791,9 @@ fn test_evm_call_wasm_balance() {
 			},
 		};
 
-		println!("BOB's  wasm token balance:{}", bob_balance);
+		println!("BOB_SHADOW's  wasm token balance:{}", bob_balance);
 
-		//5. Test  the wasm token balance of BOB being correct
+		//5. Test  the wasm token balance of BOB_SHADOW being correct
 		assert_eq!(bob_balance, token);
 	});
 }
@@ -806,8 +806,8 @@ fn test_wasm_call_evm_echo() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -819,7 +819,7 @@ fn test_wasm_call_evm_echo() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -830,12 +830,12 @@ fn test_wasm_call_evm_echo() {
 
 		assert_ok!(creation);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
 		//3. Create EVM contract
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
 			source,
@@ -880,7 +880,7 @@ fn test_wasm_call_evm_echo() {
 		let call = call.push_arg(call_para);
 
 		let result = Contracts::bare_call(
-			ALICE,
+			ALICE_SHADOW,
 			wasm_addr,
 			0,
 			WEIGHT_LIMIT,
@@ -925,8 +925,8 @@ fn test_evm_call_wasm_echo() {
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
-		let _ = Balances::deposit_creating(&ALICE, 10_000_000_000_000_000_000_000);
-		let _ = Balances::deposit_creating(&BOB, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
 		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
 
 		// 2. Create wasm contract
@@ -938,7 +938,7 @@ fn test_evm_call_wasm_echo() {
 			100_000_000_000_000_000_000_000;
 		let new_call = new_call.push_arg(init_supply);
 		let creation = Contracts::instantiate_with_code(
-			RuntimeOrigin::signed(ALICE.clone()),
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
 			subsistence * 100,
 			WEIGHT_LIMIT,
 			None,
@@ -947,16 +947,16 @@ fn test_evm_call_wasm_echo() {
 			vec![],
 		);
 		let wasm_addr =
-			Contracts::contract_address(&ALICE, &wasm_code_hash, &new_call.encode(), &[]);
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
 
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
 		//3. Create EVM contract
-		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
-			//RuntimeOrigin::signed(ALICE),
+			//RuntimeOrigin::signed(ALICE_SHADOW),
 			source,
 			evm,
 			U256::default(),
@@ -1008,7 +1008,7 @@ fn test_evm_call_wasm_echo() {
 		]
 		.concat();
 
-		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE)[0..20]));
+		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let call4evm = <Test as pallet_evm::Config>::Runner::call(
 			source_alice,

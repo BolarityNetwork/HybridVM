@@ -388,13 +388,24 @@ impl pallet_Hybrid_vm::Config for Test {
 }
 
 const A: [u8; 32] = [
-	1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7,
 ];
 const B: [u8; 32] = [
-	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8,
 ];
+
 pub const ALICE: AccountId32 = AccountId32::new(A);
 pub const BOB: AccountId32 = AccountId32::new(B);
+
+const A_SHADOW: [u8; 32] = [
+	1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+const B_SHADOW: [u8; 32] = [
+	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+];
+// Account shadow is the account which data is the source account data with the last 12 bytes setting zero 
+pub const ALICE_SHADOW: AccountId32 = AccountId32::new(A_SHADOW);
+pub const BOB_SHADOW: AccountId32 = AccountId32::new(B_SHADOW);
 
 pub struct ExtBuilder {
 	existential_deposit: u64,
