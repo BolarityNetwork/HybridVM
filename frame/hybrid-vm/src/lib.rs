@@ -102,16 +102,16 @@ pub mod pallet {
 	where
 		T::AccountId: From<AccountId32> + Into<AccountId32>,
 	{
-		pub fn call_wasm4evm(
+		pub fn call_wasm_vm(
 			origin: OriginFor<T>,
 			data: Vec<u8>,
 			target_gas: Weight,
 		) -> Result<(Vec<u8>, Weight)> {
-			InterCall::<T>::call_wasm4evm(origin, data, target_gas)
+			InterCall::<T>::call_wasm_vm(origin, data, target_gas)
 		}
 
-		pub fn call_evm4wasm<E: Ext<T = T>>(env: Environment<E, InitState>) -> Result<RetVal> {
-			InterCall::<T>::call_evm4wasm(env)
+		pub fn call_evm<E: Ext<T = T>>(env: Environment<E, InitState>) -> Result<RetVal> {
+			InterCall::<T>::call_evm(env)
 		}
 	}
 }

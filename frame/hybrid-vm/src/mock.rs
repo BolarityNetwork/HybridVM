@@ -139,7 +139,7 @@ impl hp_system::EvmHybridVMExtension<Test> for Test {
 			target_gas.unwrap_or(0),
 			false,
 		);
-		let (result_output, result_weight) = HybridVM::call_wasm4evm(origin, data, target_weight)?;
+		let (result_output, result_weight) = HybridVM::call_wasm_vm(origin, data, target_weight)?;
 
 		Ok((
 			result_output,
@@ -265,7 +265,7 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainEx
 	{
 		let func_id = env.func_id();
 		match func_id {
-			5 => HybridVM::call_evm4wasm::<E>(env),
+			5 => HybridVM::call_evm::<E>(env),
 			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),
 		}
 	}

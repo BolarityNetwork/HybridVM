@@ -79,7 +79,7 @@ impl<T: Config> InterCall<T>
 where
 	T::AccountId: From<AccountId32> + Into<AccountId32>,
 {
-	pub fn call_wasm4evm(
+	pub fn call_wasm_vm(
 		origin: OriginFor<T>,
 		data: Vec<u8>,
 		target_gas: Weight,
@@ -141,7 +141,7 @@ impl<C: Config> InterCall<C>
 where
 	C::AccountId: From<AccountId32> + Into<AccountId32>,
 {
-	pub fn call_evm4wasm<E: Ext<T = C>>(mut env: Environment<E, InitState>) -> Result<RetVal> {
+	pub fn call_evm<E: Ext<T = C>>(mut env: Environment<E, InitState>) -> Result<RetVal> {
 		if !C::EnableCallEVM::get() {
 			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
 		}
