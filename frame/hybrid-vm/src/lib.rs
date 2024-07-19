@@ -37,7 +37,7 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-
+	
 	type Result<T> = sp_std::result::Result<T, DispatchError>;
 
 	#[pallet::config]
@@ -62,6 +62,11 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
+	
+	// HybridVM contracts
+	#[pallet::storage]
+	#[pallet::getter(fn hvm_contracts)]
+	pub type HvmContracts<T: Config> = StorageMap<_, Twox64Concat, H160, UnifiedAddress<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -69,6 +74,7 @@ pub mod pallet {
 		EVMExecuted(H160),
 		WasmVMExecuted(T::AccountId),
 		HybridVMCalled(T::AccountId),
+		RegistContract(H160, UnifiedAddress<T>),
 	}
 
 	#[pallet::error]
@@ -76,6 +82,13 @@ pub mod pallet {
 	pub enum Error<T> {
 		EVMExecuteFailed,
 		WasmVMExecuteFailed,
+		UnifiedAddressError,
+		NoWasmVMContract,
+	}
+	
+	#[derive(PartialEq)]
+	pub enum UnifiedAddress<T: Config> {
+		WasmVM(T::AccountId),
 	}
 
 	#[pallet::hooks]
@@ -94,6 +107,41 @@ pub mod pallet {
 			// Todo
 			Self::deposit_event(Event::HybridVMCalled(who));
 
+			Ok(().into())
+		}
+	
+		#[pallet::call_index(1)]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
+		pub fn regist_contract(
+			origin: OriginFor<T>,
+            unified_address: UnifiedAddress<T>,
+		) -> DispatchResultWithPostInfo {
+			let who = ensure_signed(origin)?;
+			
+			match unified_address {
+				WasmVM(account) => {
+					let value = pallet_contracts::<T>::get_storage(account.clone());
+					Match value {
+						Err(t) => {
+							if t == pallet_contracts::ContractAccessError::DoesntExist {
+								return Err(Error::<T>::NoWasmVMContract);
+							}
+						}
+					}
+					
+					let mut address_arr = [0u8; 32];
+		            let accountid: AccountId32 = account.into();
+		            address_arr[0..32].copy_from_slice(accountid.as_byte_slice());
+		            let address = H160::from_slice(&address_arr[0..20]);
+					
+					HvmContracts::<T>::insert(address, unified_address);
+				}
+				_ => {
+					return Err(Error::<T>::UnifiedAddressError);
+				}
+			}
+			
+			Self::deposit_event(Event::RegistContract(address, unified_address));
 			Ok(().into())
 		}
 	}
