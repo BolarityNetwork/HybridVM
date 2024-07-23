@@ -197,7 +197,7 @@ pub mod pallet {
 	pub type Origin = RawOrigin;
 
 	#[pallet::config]
-	pub trait Config: frame_system::Config + pallet_evm::Config {
+	pub trait Config: frame_system::Config + pallet_evm::Config + pallet_hybrid_vm::Config {
 		/// The overarching event type.
 		type RuntimeEvent: From<Event> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
 		/// How Ethereum state root is calculated.
@@ -657,16 +657,73 @@ impl<T: Config> Pallet<T> {
 		match action {
 			ethereum::TransactionAction::Call(target) => {
 				let vm_target = <T as pallet_hybrid_vm::Config>::HvmContracts::get(target);
+				let target = match vm_target {
+					Some(WasmVM(t)) => t,
+					None => {
+						        return Err(DispatchErrorWithPostInfo {
+							                post_info: PostDispatchInfo {
+								                actual_weight: None,
+								                pays_fee: Pays::Yes,
+							                },
+							                error: DispatchError::from("Not HybridVM Contract(REVERT)"),
+						                })?;
+					}
+				}
+								
+				let mut a: [u8; 4] = Default::default();
+		        a.copy_from_slice(&BlakeTwo256::hash(b"evm_abi_call")[0..4]);
+		        let evm_abi_call = ExecutionInput::new(Selector::new(a)).push_arg(input);
 				
+		        let weight_limit: Weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(gas_limit.unwrap_or(0), false);
+
+		        let origin = ensure_signed(<T as pallet_evm::Config>::AddressMapping::into_account_id(source))?;
+
+		        let info = pallet_contracts::Pallet::<T>::bare_call(
+			        origin,
+			        target,
+			        value.into(),
+			        weight_limit,
+			        None,
+			        evm_abi_call.encode(),
+			        DebugInfo::Skip,
+			        CollectEvents::Skip,
+			        Determinism::Enforced,
+		        );
+		        let output: ResultBox<Vec<u8>>;
+		        match info.result {
+			        Ok(return_value) => {
+				        if !return_value.did_revert() {
+					        // because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
+					        output = return_value.data[1..].iter().cloned().collect();
+				        } else {
+					        return Err(DispatchErrorWithPostInfo {
+							            post_info: PostDispatchInfo {
+								            actual_weight: Some(e.weight),
+								            pays_fee: Pays::Yes,
+							            },
+							            error: DispatchError::from("Call wasm contract failed(REVERT)"),
+							        });
+				        }
+			        },
+			        Err(e) => {
+						        return Err(DispatchErrorWithPostInfo {
+							            post_info: PostDispatchInfo {
+								            actual_weight: Some(e.weight),
+								            pays_fee: Pays::Yes,
+							            },
+							            error: e.error.into(),
+						            });
+					}
+		        }					
 			}
 			_ => {
                     return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
-								actual_weight: Some(e.weight),
+								actual_weight: None,
 								pays_fee: Pays::Yes,
 							},
-							error: e.error.into(),
-						})
+							error: DispatchError::from("Not HybridVM Contract Call(REVERT)"),
+						});
 			}
 		}
 	}

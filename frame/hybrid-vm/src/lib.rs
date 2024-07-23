@@ -127,6 +127,7 @@ pub mod pallet {
 								return Err(Error::<T>::NoWasmVMContract);
 							}
 						}
+						_ => _ ,
 					}
 					
 					let mut address_arr = [0u8; 32];
