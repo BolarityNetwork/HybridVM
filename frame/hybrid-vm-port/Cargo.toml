@@ -28,6 +28,8 @@ fp-evm = { workspace = true }
 fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
+# ink!
+ink_env = { workspace = true }
 #local
 pallet-hybrid-vm = { path = "../hybrid-vm" }
 

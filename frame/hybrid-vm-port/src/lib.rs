@@ -54,16 +54,16 @@ use frame_support::{
 	traits::{EnsureOrigin, Get, PalletInfoAccess, Time},
 	weights::Weight,
 };
-use frame_system::{ensure_signed, pallet_prelude::OriginFor, CheckWeight, WeightInfo};
+use frame_system::{pallet_prelude::OriginFor, CheckWeight, WeightInfo};
 use sp_runtime::{
 	generic::DigestItem,
 	traits::{
-		BlakeTwo256, DispatchInfoOf, Dispatchable, One, Saturating, UniqueSaturatedInto, Zero,
+		BlakeTwo256, DispatchInfoOf, Dispatchable, Hash, One, Saturating, UniqueSaturatedInto, Zero,
 	},
 	transaction_validity::{
 		InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransactionBuilder,
 	},
-	DispatchError, RuntimeDebug, SaturatedConversion,
+	AccountId32, DispatchError, RuntimeDebug, SaturatedConversion,
 };
 // Frontier
 use fp_consensus::{PostLog, PreLog, FRONTIER_ENGINE_ID};
@@ -71,13 +71,14 @@ pub use fp_ethereum::TransactionData;
 use fp_ethereum::ValidatedTransaction as ValidatedTransactionT;
 use fp_evm::{
 	CallInfo, CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig,
-	TransactionValidationError,
+	TransactionValidationError, UsedGas,
 };
 pub use fp_rpc::TransactionStatus;
 use fp_storage::{EthereumStorageSchema, PALLET_ETHEREUM_SCHEMA};
 use ink_env::call::{ExecutionInput, Selector};
+use pallet_contracts::chain_extension::SysConfig;
 use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
-use pallet_evm::{BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
+use pallet_evm::{AddressMapping, BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
 use pallet_hybrid_vm::UnifiedAddress;
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode, MaxEncodedLen, TypeInfo)]
@@ -116,7 +117,7 @@ impl<T> Call<T>
 where
 	OriginFor<T>: Into<Result<RawOrigin, OriginFor<T>>>,
 	T: Send + Sync + Config,
-	T::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+	<T as SysConfig>::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
 	pub fn is_self_contained(&self) -> bool {
 		matches!(self, Call::transact { .. })
@@ -141,7 +142,7 @@ where
 	pub fn pre_dispatch_self_contained(
 		&self,
 		origin: &H160,
-		dispatch_info: &DispatchInfoOf<T::RuntimeCall>,
+		dispatch_info: &DispatchInfoOf<<T as SysConfig>::RuntimeCall>,
 		len: usize,
 	) -> Option<Result<(), TransactionValidityError>> {
 		if let Call::transact { transaction } = self {
@@ -158,7 +159,7 @@ where
 	pub fn validate_self_contained(
 		&self,
 		origin: &H160,
-		dispatch_info: &DispatchInfoOf<T::RuntimeCall>,
+		dispatch_info: &DispatchInfoOf<<T as SysConfig>::RuntimeCall>,
 		len: usize,
 	) -> Option<TransactionValidity> {
 		if let Call::transact { transaction } = self {
@@ -574,10 +575,11 @@ impl<T: Config> Pallet<T> {
 
 		match action {
 			ethereum::TransactionAction::Call(target) => {
-				if <T as pallet_hybrid_vm::Config>::HvmContracts::contains_key(target) {
+				if pallet_hybrid_vm::HvmContracts::<T>::contains_key(target) {
 					return true;
 				}
 			},
+			_ => {},
 		}
 
 		false
@@ -586,16 +588,22 @@ impl<T: Config> Pallet<T> {
 	fn call_hybrid_vm(
 		source: H160,
 		transaction: Transaction,
-	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
+	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo>
+	where
+		<<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<
+			<T as SysConfig>::AccountId,
+		>>::Balance: From<ethereum_types::U256>,
+		<T as SysConfig>::AccountId: From<AccountId32>,
+	{
 		let (
 			input,
 			value,
 			gas_limit,
-			max_fee_per_gas,
-			max_priority_fee_per_gas,
-			nonce,
+			_max_fee_per_gas,
+			_max_priority_fee_per_gas,
+			_nonce,
 			action,
-			access_list,
+			_access_list,
 		) = {
 			match transaction {
 				// max_fee_per_gas and max_priority_fee_per_gas in legacy and 2930 transactions is
@@ -649,9 +657,9 @@ impl<T: Config> Pallet<T> {
 
 		match action {
 			ethereum::TransactionAction::Call(target) => {
-				let vm_target = <T as pallet_hybrid_vm::Config>::HvmContracts::get(target);
+				let vm_target = pallet_hybrid_vm::Pallet::<T>::hvm_contracts(target);
 				let target = match vm_target {
-					Some(UnifiedAddress::<T>::WasmVM(t)) => t,
+					Some(UnifiedAddress::WasmVM(t)) => t,
 					None => {
 						return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
@@ -667,20 +675,37 @@ impl<T: Config> Pallet<T> {
 				a.copy_from_slice(&BlakeTwo256::hash(b"evm_abi_call")[0..4]);
 				let evm_abi_call = ExecutionInput::new(Selector::new(a)).push_arg(input);
 
+				let mut gas_limit_u64 = u64::max_value();
+				if gas_limit.lt(&U256::from(gas_limit_u64)) {
+					gas_limit_u64 = gas_limit.as_u64();
+				}
 				let weight_limit: Weight =
 					<T as pallet_evm::Config>::GasWeightMapping::gas_to_weight(
-						gas_limit.unwrap_or(0),
+						gas_limit_u64,
 						false,
 					);
 
-				let origin = ensure_signed(
-					<T as pallet_evm::Config>::AddressMapping::into_account_id(source),
-				)?;
+				let origin = <T as pallet_evm::Config>::AddressMapping::into_account_id(source);
+				let balance_result = <<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<<T as SysConfig>::AccountId>>::Balance::try_from(value);
+				let balance = match balance_result {
+					Ok(t) => t,
+					Err(_) => {
+						return Err(DispatchErrorWithPostInfo {
+							post_info: PostDispatchInfo {
+								actual_weight: None,
+								pays_fee: Pays::Yes,
+							},
+							error: DispatchError::from(
+								"Call HybridVM Contract value is error(REVERT)",
+							),
+						})?;
+					},
+				};
 
 				let info = pallet_contracts::Pallet::<T>::bare_call(
 					origin,
-					target,
-					value.into(),
+					target.into(),
+					balance,
 					weight_limit,
 					None,
 					evm_abi_call.encode(),
@@ -697,16 +722,20 @@ impl<T: Config> Pallet<T> {
 							let call_info = CallInfo {
 								exit_reason: ExitReason::Succeed(ExitSucceed::Returned),
 								value: output,
-								used_gas:
-									<T as pallet_evm::Config>::GasWeightMapping::weight_to_gas(
-										info.gas_consumed,
+								used_gas: UsedGas {
+									standard: U256::from(
+										<T as pallet_evm::Config>::GasWeightMapping::weight_to_gas(
+											info.gas_consumed,
+										),
 									),
+									effective: U256::from(0u64),
+								},
 								weight_info: None,
 								logs: vec![],
 							};
 							return Ok((
 								PostDispatchInfo {
-									actual_weight: info.gas_consumed,
+									actual_weight: Some(info.gas_consumed),
 									pays_fee: Pays::Yes,
 								},
 								CallOrCreateInfo::Call(call_info),
@@ -714,10 +743,7 @@ impl<T: Config> Pallet<T> {
 						} else {
 							return Err(DispatchErrorWithPostInfo {
 								post_info: PostDispatchInfo {
-									actual_weight:
-										<T as pallet_evm::Config>::GasWeightMapping::weight_to_gas(
-											info.gas_consumed,
-										),
+									actual_weight: Some(info.gas_consumed),
 									pays_fee: Pays::Yes,
 								},
 								error: DispatchError::from("Call wasm contract failed(REVERT)"),
@@ -727,10 +753,10 @@ impl<T: Config> Pallet<T> {
 					Err(e) => {
 						return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
-								actual_weight: Some(e.weight),
+								actual_weight: None,
 								pays_fee: Pays::Yes,
 							},
-							error: e.error.into(),
+							error: e,
 						});
 					},
 				}
@@ -749,7 +775,7 @@ impl<T: Config> Pallet<T> {
 		transaction: Transaction,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
 		//firstly, check if it's the ethereum transaction or HybridVM transaction
-		if Self::is_hybrid_vm_transaction(transaction) {
+		if Self::is_hybrid_vm_transaction(transaction.clone()) {
 			return Self::call_hybrid_vm(source, transaction);
 		}
 
