@@ -119,15 +119,14 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			
 			match unified_address {
-				WasmVM(account) => {
-					let value = pallet_contracts::<T>::get_storage(account.clone());
-					Match value {
+				UnifiedAddress::<T>::WasmVM(account) => {
+					let value = pallet_contracts::Pallet::<T>::get_storage(account.clone());
+					match value {
 						Err(t) => {
 							if t == pallet_contracts::ContractAccessError::DoesntExist {
 								return Err(Error::<T>::NoWasmVMContract);
 							}
 						}
-						_ => _ ,
 					}
 					
 					let mut address_arr = [0u8; 32];
@@ -136,14 +135,12 @@ pub mod pallet {
 		            let address = H160::from_slice(&address_arr[0..20]);
 					
 					HvmContracts::<T>::insert(address, unified_address);
+					
+					Self::deposit_event(Event::RegistContract(address, unified_address));
+					Ok(().into())
 				}
-				_ => {
-					return Err(Error::<T>::UnifiedAddressError);
-				}
+				_ => Err(Error::<T>::UnifiedAddressError),
 			}
-			
-			Self::deposit_event(Event::RegistContract(address, unified_address));
-			Ok(().into())
 		}
 	}
 

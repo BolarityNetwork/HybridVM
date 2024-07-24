@@ -43,21 +43,21 @@ pub use ethereum::{
 	TransactionAction, TransactionV2 as Transaction,
 };
 use ethereum_types::{Bloom, BloomInput, H160, H256, H64, U256};
-use evm::ExitReason;
+use evm::{ExitReason, ExitSucceed};
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 // Substrate
 use frame_support::{
 	dispatch::{
-		DispatchErrorWithPostInfo, DispatchInfo, DispatchResultWithPostInfo, Pays, PostDispatchInfo,
+		DispatchError, DispatchErrorWithPostInfo, DispatchInfo, DispatchResultWithPostInfo, Pays, PostDispatchInfo,
 	},
 	traits::{EnsureOrigin, Get, PalletInfoAccess, Time},
 	weights::Weight,
 };
-use frame_system::{pallet_prelude::OriginFor, CheckWeight, WeightInfo};
+use frame_system::{pallet_prelude::OriginFor, CheckWeight, ensure_signed, WeightInfo};
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{DispatchInfoOf, Dispatchable, One, Saturating, UniqueSaturatedInto, Zero},
+	traits::{BlakeTwo256, DispatchInfoOf, Dispatchable, One, Saturating, UniqueSaturatedInto, Zero},
 	transaction_validity::{
 		InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransactionBuilder,
 	},
@@ -68,11 +68,12 @@ use fp_consensus::{PostLog, PreLog, FRONTIER_ENGINE_ID};
 pub use fp_ethereum::TransactionData;
 use fp_ethereum::ValidatedTransaction as ValidatedTransactionT;
 use fp_evm::{
-	CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig, TransactionValidationError,
+	CallInfo, CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig, TransactionValidationError,
 };
 pub use fp_rpc::TransactionStatus;
 use fp_storage::{EthereumStorageSchema, PALLET_ETHEREUM_SCHEMA};
 use pallet_evm::{BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
+use pallet_hybrid_vm::UnifiedAddress;
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug)]
 #[derive(Encode, Decode, MaxEncodedLen, TypeInfo)]
@@ -658,7 +659,7 @@ impl<T: Config> Pallet<T> {
 			ethereum::TransactionAction::Call(target) => {
 				let vm_target = <T as pallet_hybrid_vm::Config>::HvmContracts::get(target);
 				let target = match vm_target {
-					Some(WasmVM(t)) => t,
+					Some(UnifiedAddress::<T>::WasmVM(t)) => t,
 					None => {
 						        return Err(DispatchErrorWithPostInfo {
 							                post_info: PostDispatchInfo {
@@ -668,13 +669,13 @@ impl<T: Config> Pallet<T> {
 							                error: DispatchError::from("Not HybridVM Contract(REVERT)"),
 						                })?;
 					}
-				}
+				};
 								
 				let mut a: [u8; 4] = Default::default();
 		        a.copy_from_slice(&BlakeTwo256::hash(b"evm_abi_call")[0..4]);
 		        let evm_abi_call = ExecutionInput::new(Selector::new(a)).push_arg(input);
 				
-		        let weight_limit: Weight = <Test as pallet_evm::Config>::GasWeightMapping::gas_to_weight(gas_limit.unwrap_or(0), false);
+		        let weight_limit: Weight = <T as pallet_evm::Config>::GasWeightMapping::gas_to_weight(gas_limit.unwrap_or(0), false);
 
 		        let origin = ensure_signed(<T as pallet_evm::Config>::AddressMapping::into_account_id(source))?;
 
@@ -689,12 +690,26 @@ impl<T: Config> Pallet<T> {
 			        CollectEvents::Skip,
 			        Determinism::Enforced,
 		        );
-		        let output: ResultBox<Vec<u8>>;
+		        let output: Vec<u8>;
 		        match info.result {
 			        Ok(return_value) => {
 				        if !return_value.did_revert() {
 					        // because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
 					        output = return_value.data[1..].iter().cloned().collect();
+							let call_info = CallInfo {
+								exit_reason: ExitReason::Succeed(ExitSucceed::Returned),
+								value: output,
+								used_gas: <T as pallet_evm::Config>::GasWeightMapping::weight_to_gas(info.gas_consumed),
+								weight_info: None,
+								logs:Vec![],
+							}
+							return Ok((
+	                            PostDispatchInfo {
+				                    actual_weight: info.gas_consumed,
+				                    pays_fee: Pays::Yes,
+			                    },
+			                    CallOrCreateInfo::Call(call_info),
+		                    ));
 				        } else {
 					        return Err(DispatchErrorWithPostInfo {
 							            post_info: PostDispatchInfo {
@@ -733,7 +748,7 @@ impl<T: Config> Pallet<T> {
 		transaction: Transaction,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
 		//firstly, check if it's the ethereum transaction or HybridVM transaction
-		if let Self::is_hybrid_vm_transaction(transaction) {
+		if Self::is_hybrid_vm_transaction(transaction) {
 				return Self::call_hybrid_vm(source, transaction)
 		}
 		
