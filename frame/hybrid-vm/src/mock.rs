@@ -403,7 +403,7 @@ const A_SHADOW: [u8; 32] = [
 const B_SHADOW: [u8; 32] = [
 	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 ];
-// Account shadow is the account which data is the source account data with the last 12 bytes setting zero 
+// Account shadow is the account which data is the source account data with the last 12 bytes setting zero
 pub const ALICE_SHADOW: AccountId32 = AccountId32::new(A_SHADOW);
 pub const BOB_SHADOW: AccountId32 = AccountId32::new(B_SHADOW);
 

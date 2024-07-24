@@ -755,7 +755,8 @@ fn test_evm_call_wasm_balance() {
 		let wasm_contract: [u8; 32] = wasm_addr.clone().into();
 
 		let evm_call_wasm_input =
-			[&evm_call_wasm_selector[..], AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW), &wasm_contract].concat();
+			[&evm_call_wasm_selector[..], AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW), &wasm_contract]
+				.concat();
 
 		let source_alice = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 

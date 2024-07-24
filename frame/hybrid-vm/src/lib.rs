@@ -23,11 +23,12 @@ mod tests;
 mod interoperate;
 
 use self::interoperate::InterCall;
+use byte_slice_cast::*;
 use ethereum::TransactionV2 as Transaction;
-use frame_support::sp_runtime::AccountId32;
 use frame_support::traits::{tokens::fungible::Inspect, Currency, Get};
 use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
 use sp_core::{H160, U256};
+use sp_runtime::{AccountId32, DispatchError};
 use sp_std::vec::Vec;
 
 pub use self::pallet::*;
@@ -37,8 +38,13 @@ pub mod pallet {
 	use super::*;
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
-	
+
 	type Result<T> = sp_std::result::Result<T, DispatchError>;
+
+	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, Debug, PartialEq)]
+	pub enum UnifiedAddress {
+		WasmVM(AccountId32),
+	}
 
 	#[pallet::config]
 	pub trait Config: frame_system::Config + pallet_contracts::Config + pallet_evm::Config {
@@ -62,11 +68,12 @@ pub mod pallet {
 
 	#[pallet::pallet]
 	pub struct Pallet<T>(_);
-	
+
 	// HybridVM contracts
 	#[pallet::storage]
 	#[pallet::getter(fn hvm_contracts)]
-	pub type HvmContracts<T: Config> = StorageMap<_, Twox64Concat, H160, UnifiedAddress<T>, OptionQuery>;
+	pub type HvmContracts<T: Config> =
+		StorageMap<_, Twox64Concat, H160, UnifiedAddress, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -74,7 +81,7 @@ pub mod pallet {
 		EVMExecuted(H160),
 		WasmVMExecuted(T::AccountId),
 		HybridVMCalled(T::AccountId),
-		RegistContract(H160, UnifiedAddress<T>),
+		RegistContract(H160, UnifiedAddress, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -85,17 +92,15 @@ pub mod pallet {
 		UnifiedAddressError,
 		NoWasmVMContract,
 	}
-	
-	#[derive(PartialEq)]
-	pub enum UnifiedAddress<T: Config> {
-		WasmVM(T::AccountId),
-	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T> {
+	impl<T: Config> Pallet<T>
+	where
+		T::AccountId: From<AccountId32> + Into<AccountId32>,
+	{
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn call_hybrid_vm(
@@ -109,37 +114,37 @@ pub mod pallet {
 
 			Ok(().into())
 		}
-	
+
 		#[pallet::call_index(1)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn regist_contract(
 			origin: OriginFor<T>,
-            unified_address: UnifiedAddress<T>,
+			unified_address: UnifiedAddress,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
-			
-			match unified_address {
-				UnifiedAddress::<T>::WasmVM(account) => {
-					let value = pallet_contracts::Pallet::<T>::get_storage(account.clone());
+
+			match unified_address.clone() {
+				UnifiedAddress::WasmVM(account) => {
+					let value =
+						pallet_contracts::Pallet::<T>::get_storage(account.clone().into(), vec![]);
 					match value {
 						Err(t) => {
 							if t == pallet_contracts::ContractAccessError::DoesntExist {
-								return Err(Error::<T>::NoWasmVMContract);
+								return Err(Error::<T>::NoWasmVMContract.into());
 							}
-						}
+						},
+						_ => {},
 					}
-					
 					let mut address_arr = [0u8; 32];
-		            let accountid: AccountId32 = account.into();
-		            address_arr[0..32].copy_from_slice(accountid.as_byte_slice());
-		            let address = H160::from_slice(&address_arr[0..20]);
-					
-					HvmContracts::<T>::insert(address, unified_address);
-					
-					Self::deposit_event(Event::RegistContract(address, unified_address));
+					let accountid: AccountId32 = account.into();
+					address_arr[0..32].copy_from_slice(accountid.as_byte_slice());
+					let address = H160::from_slice(&address_arr[0..20]);
+
+					HvmContracts::<T>::insert(address, unified_address.clone());
+
+					Self::deposit_event(Event::RegistContract(address, unified_address, who));
 					Ok(().into())
-				}
-				_ => Err(Error::<T>::UnifiedAddressError),
+				},
 			}
 		}
 	}
