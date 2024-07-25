@@ -31,7 +31,7 @@ pub trait EvmHybridVMExtension<C: frame_system::Config> {
 	
 pub trait U256BalanceMapping<T: frame_system::Config> {
 	type BalanceOf<T>: Inspect<<T as frame_system::Config>::AccountId>>::Balance;
-	fn u256_to_balance(value: U256) -> BalanceOf<T>;
+	fn u256_to_balance(value: U256) -> Option(BalanceOf<T>);
 }
 
 pub trait AccountIdMapping<C: frame_system::Config> {

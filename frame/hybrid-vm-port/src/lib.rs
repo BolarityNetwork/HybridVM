@@ -588,13 +588,7 @@ impl<T: Config> Pallet<T> {
 	fn call_hybrid_vm(
 		source: H160,
 		transaction: Transaction,
-	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo>
-	where
-		<<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<
-			<T as SysConfig>::AccountId,
-		>>::Balance: From<ethereum_types::U256>,
-		<T as SysConfig>::AccountId: From<AccountId32>,
-	{
+	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
 		let (
 			input,
 			value,
@@ -659,7 +653,7 @@ impl<T: Config> Pallet<T> {
 			ethereum::TransactionAction::Call(target) => {
 				let vm_target = pallet_hybrid_vm::Pallet::<T>::hvm_contracts(target);
 				let target = match vm_target {
-					Some(UnifiedAddress::WasmVM(t)) => t,
+					Some(UnifiedAddress::<T>::WasmVM(t)) => t,
 					None => {
 						return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
@@ -686,10 +680,10 @@ impl<T: Config> Pallet<T> {
 					);
 
 				let origin = <T as pallet_evm::Config>::AddressMapping::into_account_id(source);
-				let balance_result = <<T as pallet_contracts::Config>::Currency as frame_support::traits::fungible::Inspect<<T as SysConfig>::AccountId>>::Balance::try_from(value);
+				let balance_result = <T as pallet_hybrid_vm::Config>::U256BalanceMapping::u256_to_balance(value);
 				let balance = match balance_result {
-					Ok(t) => t,
-					Err(_) => {
+					Some(t) => t,
+					None => {
 						return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
 								actual_weight: None,

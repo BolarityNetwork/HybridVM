@@ -134,20 +134,14 @@ impl<T: Config> InterCall<T> {
 	}
 }
 
-impl<C: Config> InterCall<C>
-where
-	C::AccountId: From<AccountId32> + Into<AccountId32>,
-{
+impl<C: Config> InterCall<C> {
 	pub fn call_evm<E: Ext<T = C>>(mut env: Environment<E, InitState>) -> Result<RetVal> {
 		if !C::EnableCallEVM::get() {
 			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
 		}
 
-		let mut source_arr = [0u8; 32];
 		let caller = env.ext().caller();
-		let caller_accountid: AccountId32 = caller.account_id()?.clone().into();
-		source_arr[0..32].copy_from_slice(caller_accountid.as_byte_slice());
-		let source = H160::from_slice(&source_arr[0..20]);
+		let source = T::AccountIdMapping::into_address(caller.account_id()?);
 
 		let mut envbuf = env.buf_in_buf_out();
 		let input0: Vec<u8> = envbuf.read_as_unbounded(envbuf.in_len())?;
