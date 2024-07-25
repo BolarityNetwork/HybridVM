@@ -54,11 +54,11 @@ pub mod pallet {
 		// Currency type for balance storage.
 		type Currency: Currency<Self::AccountId> + Inspect<Self::AccountId>;
 		
-		type U256BalanceMapping: U256BalanceMapping<Self as frame_system::Config>;
+		type U256BalanceMapping: U256BalanceMapping<Self>;
 		
-		type AccountIdMapping: AccountIdMapping<Self as frame_system::Config>;
+		type AccountIdMapping: AccountIdMapping<Self>;
 		
-		type AccountId32Mapping: AccountId32Mapping<Self as frame_system::Config>;
+		type AccountId32Mapping: AccountId32Mapping<Self>;
 
 		#[pallet::constant]
 		type EnableCallEVM: Get<bool>;

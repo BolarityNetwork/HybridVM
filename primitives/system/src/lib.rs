@@ -16,9 +16,9 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use frame_system::pallet_prelude::*;
-use frame_support::traits::fungible::Inspect;
+use frame_support::traits::tokens::Balance;
 use sp_std::vec::Vec;
-use sp_core::H160;
+use sp_core::{H160, U256};
 use sp_runtime::AccountId32;
 
 pub trait EvmHybridVMExtension<C: frame_system::Config> {
@@ -29,9 +29,9 @@ pub trait EvmHybridVMExtension<C: frame_system::Config> {
 	) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>;
 }
 	
-pub trait U256BalanceMapping<T: frame_system::Config> {
-	type BalanceOf<T>: Inspect<T::AccountId>::Balance;
-	fn u256_to_balance(value: U256) -> Option(BalanceOf<T>);
+pub trait U256BalanceMapping {
+	type Balance: Balance;
+	fn u256_to_balance(value: U256) -> Option<Self::Balance>;
 }
 
 pub trait AccountIdMapping<C: frame_system::Config> {
