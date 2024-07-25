@@ -23,14 +23,15 @@ mod tests;
 mod interoperate;
 
 use self::interoperate::InterCall;
-use byte_slice_cast::*;
 use ethereum::TransactionV2 as Transaction;
 use frame_support::traits::{tokens::fungible::Inspect, Currency, Get};
+use frame_support::RuntimeDebugNoBound;
 use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
 use sp_core::{H160, U256};
 use sp_runtime::{AccountId32, DispatchError};
 use sp_std::vec::Vec;
-use hp_system::{AccountIdMapping, AccountId32Mapping, U256BalanceMapping};
+//use sp_std::fmt::Debug;
+use hp_system::{AccountId32Mapping, AccountIdMapping, U256BalanceMapping};
 
 pub use self::pallet::*;
 
@@ -42,7 +43,8 @@ pub mod pallet {
 
 	type Result<T> = sp_std::result::Result<T, DispatchError>;
 
-	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, Debug, PartialEq)]
+	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, RuntimeDebugNoBound, PartialEq)]
+	#[scale_info(skip_type_params(T))]
 	pub enum UnifiedAddress<T: Config> {
 		WasmVM(T::AccountId),
 	}
@@ -53,11 +55,11 @@ pub mod pallet {
 
 		// Currency type for balance storage.
 		type Currency: Currency<Self::AccountId> + Inspect<Self::AccountId>;
-		
-		type U256BalanceMapping: U256BalanceMapping<Self>;
-		
+
+		type U256BalanceMapping: U256BalanceMapping<Balance = <<Self as pallet_contracts::Config>::Currency as Inspect<Self::AccountId>>::Balance>;
+
 		type AccountIdMapping: AccountIdMapping<Self>;
-		
+
 		type AccountId32Mapping: AccountId32Mapping<Self>;
 
 		#[pallet::constant]
@@ -80,7 +82,7 @@ pub mod pallet {
 	#[pallet::storage]
 	#[pallet::getter(fn hvm_contracts)]
 	pub type HvmContracts<T: Config> =
-		StorageMap<_, Twox64Concat, H160, UnifiedAddress, OptionQuery>;
+		StorageMap<_, Twox64Concat, H160, UnifiedAddress<T>, OptionQuery>;
 
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
@@ -88,7 +90,7 @@ pub mod pallet {
 		EVMExecuted(H160),
 		WasmVMExecuted(T::AccountId),
 		HybridVMCalled(T::AccountId),
-		RegistContract(H160, UnifiedAddress, T::AccountId),
+		RegistContract(H160, UnifiedAddress<T>, T::AccountId),
 	}
 
 	#[pallet::error]
@@ -123,14 +125,13 @@ pub mod pallet {
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn regist_contract(
 			origin: OriginFor<T>,
-			unified_address: UnifiedAddress,
+			unified_address: UnifiedAddress<T>,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 
 			match unified_address.clone() {
 				UnifiedAddress::<T>::WasmVM(account) => {
-					let value =
-						pallet_contracts::Pallet::<T>::get_storage(account.clone(), vec![]);
+					let value = pallet_contracts::Pallet::<T>::get_storage(account.clone(), vec![]);
 					match value {
 						Err(t) => {
 							if t == pallet_contracts::ContractAccessError::DoesntExist {
@@ -140,7 +141,7 @@ pub mod pallet {
 						_ => {},
 					}
 					let address = T::AccountIdMapping::into_address(account);
-	
+
 					HvmContracts::<T>::insert(address, unified_address.clone());
 
 					Self::deposit_event(Event::RegistContract(address, unified_address, who));

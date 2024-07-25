@@ -15,11 +15,11 @@
 
 #![cfg_attr(not(feature = "std"), no_std)]
 
-use frame_system::pallet_prelude::*;
 use frame_support::traits::tokens::Balance;
-use sp_std::vec::Vec;
+use frame_system::pallet_prelude::*;
 use sp_core::{H160, U256};
 use sp_runtime::AccountId32;
+use sp_std::vec::Vec;
 
 pub trait EvmHybridVMExtension<C: frame_system::Config> {
 	fn call_hybrid_vm(
@@ -28,7 +28,7 @@ pub trait EvmHybridVMExtension<C: frame_system::Config> {
 		target_gas: Option<u64>,
 	) -> Result<(Vec<u8>, u64), sp_runtime::DispatchError>;
 }
-	
+
 pub trait U256BalanceMapping {
 	type Balance: Balance;
 	fn u256_to_balance(value: U256) -> Option<Self::Balance>;

@@ -32,6 +32,7 @@ pallet-evm = { workspace = true }
 ink_env = { workspace = true }
 #local
 pallet-hybrid-vm = { path = "../hybrid-vm" }
+hp-system = { path = "../../primitives/system" }
 
 [dev-dependencies]
 hex = { workspace = true }

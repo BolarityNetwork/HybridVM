@@ -63,7 +63,7 @@ use sp_runtime::{
 	transaction_validity::{
 		InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransactionBuilder,
 	},
-	AccountId32, DispatchError, RuntimeDebug, SaturatedConversion,
+	DispatchError, RuntimeDebug, SaturatedConversion,
 };
 // Frontier
 use fp_consensus::{PostLog, PreLog, FRONTIER_ENGINE_ID};
@@ -75,6 +75,7 @@ use fp_evm::{
 };
 pub use fp_rpc::TransactionStatus;
 use fp_storage::{EthereumStorageSchema, PALLET_ETHEREUM_SCHEMA};
+use hp_system::U256BalanceMapping;
 use ink_env::call::{ExecutionInput, Selector};
 use pallet_contracts::chain_extension::SysConfig;
 use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
@@ -680,7 +681,8 @@ impl<T: Config> Pallet<T> {
 					);
 
 				let origin = <T as pallet_evm::Config>::AddressMapping::into_account_id(source);
-				let balance_result = <T as pallet_hybrid_vm::Config>::U256BalanceMapping::u256_to_balance(value);
+				let balance_result =
+					<T as pallet_hybrid_vm::Config>::U256BalanceMapping::u256_to_balance(value);
 				let balance = match balance_result {
 					Some(t) => t,
 					None => {

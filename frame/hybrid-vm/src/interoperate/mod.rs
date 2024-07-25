@@ -36,7 +36,6 @@ use sp_runtime::DispatchError;
 
 use serde::{Deserialize, Serialize};
 
-use byte_slice_cast::AsByteSlice;
 use fp_evm::ExecutionInfoV2;
 use frame_support::sp_runtime::AccountId32;
 use pallet_evm::Runner;
@@ -141,7 +140,7 @@ impl<C: Config> InterCall<C> {
 		}
 
 		let caller = env.ext().caller();
-		let source = T::AccountIdMapping::into_address(caller.account_id()?);
+		let source = C::AccountIdMapping::into_address(caller.account_id()?.clone());
 
 		let mut envbuf = env.buf_in_buf_out();
 		let input0: Vec<u8> = envbuf.read_as_unbounded(envbuf.in_len())?;
