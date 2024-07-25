@@ -75,10 +75,7 @@ fn str2s(s: String) -> &'static str {
 	Box::leak(s.into_boxed_str())
 }
 
-impl<T: Config> InterCall<T>
-where
-	T::AccountId: From<AccountId32> + Into<AccountId32>,
-{
+impl<T: Config> InterCall<T> {
 	pub fn call_wasm_vm(
 		origin: OriginFor<T>,
 		data: Vec<u8>,
@@ -99,7 +96,7 @@ where
 		let gas_limit: Weight = target_gas;
 
 		let origin = ensure_signed(origin)?;
-		let target = T::AccountId::from(target);
+		let target = T::AccountId32Mapping::id32_to_id(target);
 
 		let info = pallet_contracts::Pallet::<T>::bare_call(
 			origin,

@@ -30,6 +30,7 @@ use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
 use sp_core::{H160, U256};
 use sp_runtime::{AccountId32, DispatchError};
 use sp_std::vec::Vec;
+use hp_system::{AccountIdMapping, AccountId32Mapping, U256BalanceMapping};
 
 pub use self::pallet::*;
 
@@ -42,8 +43,8 @@ pub mod pallet {
 	type Result<T> = sp_std::result::Result<T, DispatchError>;
 
 	#[derive(Encode, Decode, MaxEncodedLen, TypeInfo, Clone, Debug, PartialEq)]
-	pub enum UnifiedAddress {
-		WasmVM(AccountId32),
+	pub enum UnifiedAddress<T: Config> {
+		WasmVM(T::AccountId),
 	}
 
 	#[pallet::config]
@@ -52,6 +53,12 @@ pub mod pallet {
 
 		// Currency type for balance storage.
 		type Currency: Currency<Self::AccountId> + Inspect<Self::AccountId>;
+		
+		type U256BalanceMapping: U256BalanceMapping<Self as frame_system::Config>;
+		
+		type AccountIdMapping: AccountIdMapping<Self as frame_system::Config>;
+		
+		type AccountId32Mapping: AccountId32Mapping<Self as frame_system::Config>;
 
 		#[pallet::constant]
 		type EnableCallEVM: Get<bool>;
@@ -97,10 +104,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {}
 
 	#[pallet::call]
-	impl<T: Config> Pallet<T>
-	where
-		T::AccountId: From<AccountId32> + Into<AccountId32>,
-	{
+	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn call_hybrid_vm(
@@ -124,9 +128,9 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 
 			match unified_address.clone() {
-				UnifiedAddress::WasmVM(account) => {
+				UnifiedAddress::<T>::WasmVM(account) => {
 					let value =
-						pallet_contracts::Pallet::<T>::get_storage(account.clone().into(), vec![]);
+						pallet_contracts::Pallet::<T>::get_storage(account.clone(), vec![]);
 					match value {
 						Err(t) => {
 							if t == pallet_contracts::ContractAccessError::DoesntExist {
@@ -135,11 +139,8 @@ pub mod pallet {
 						},
 						_ => {},
 					}
-					let mut address_arr = [0u8; 32];
-					let accountid: AccountId32 = account.into();
-					address_arr[0..32].copy_from_slice(accountid.as_byte_slice());
-					let address = H160::from_slice(&address_arr[0..20]);
-
+					let address = T::AccountIdMapping::into_address(account);
+	
 					HvmContracts::<T>::insert(address, unified_address.clone());
 
 					Self::deposit_event(Event::RegistContract(address, unified_address, who));

@@ -19,6 +19,7 @@ use frame_system::pallet_prelude::*;
 use frame_support::traits::fungible::Inspect;
 use sp_std::vec::Vec;
 use sp_core::H160;
+use sp_runtime::AccountId32;
 
 pub trait EvmHybridVMExtension<C: frame_system::Config> {
 	fn call_hybrid_vm(
@@ -35,4 +36,9 @@ pub trait U256BalanceMapping<T: frame_system::Config> {
 
 pub trait AccountIdMapping<C: frame_system::Config> {
 	fn into_address(account_id: C::AccountId) -> H160;
+}
+
+pub trait AccountId32Mapping<C: frame_system::Config> {
+	fn id32_to_id(id32: AccountId32) -> C::AccountId;
+	fn id_to_id32(account_id: C::AccountId) -> AccountId32;
 }
