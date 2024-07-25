@@ -684,8 +684,8 @@ impl<T: Config> Pallet<T> {
 				let balance_result =
 					<T as pallet_hybrid_vm::Config>::U256BalanceMapping::u256_to_balance(value);
 				let balance = match balance_result {
-					Some(t) => t,
-					None => {
+					Ok(t) => t,
+					Err(_) => {
 						return Err(DispatchErrorWithPostInfo {
 							post_info: PostDispatchInfo {
 								actual_weight: None,

@@ -80,3 +80,9 @@ pallet-evm-precompile-simple = { git = "https://github.com/paritytech/frontier",
 # ink
 ink_env = { git = "https://github.com/paritytech/ink" }
 
+# hybrid vm
+hp-system = { path = "primitives/system", default-features = false }
+pallet-hybrid-vm = { path = "frame/hybrid-vm", default-features = false }
+pallet-hybrid-vm-port = { path = "frame/hybrid-vm-port", default-features = false }
+pallet-evm-precompile-call-hybrid-vm = { path = "frame/evm-precompile/call-hybrid-vm" }
+

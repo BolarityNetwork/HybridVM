@@ -31,7 +31,7 @@ pub trait EvmHybridVMExtension<C: frame_system::Config> {
 
 pub trait U256BalanceMapping {
 	type Balance: Balance;
-	fn u256_to_balance(value: U256) -> Option<Self::Balance>;
+	fn u256_to_balance(value: U256) -> Result<Self::Balance, &'static str>;
 }
 
 pub trait AccountIdMapping<C: frame_system::Config> {

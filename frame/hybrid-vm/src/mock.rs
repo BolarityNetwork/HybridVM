@@ -15,6 +15,7 @@
 
 use super::*;
 
+use byte_slice_cast::AsByteSlice;
 use fp_evm::Precompile;
 use frame_support::pallet_prelude::*;
 use frame_support::{
@@ -26,7 +27,7 @@ use frame_support::{
 	ConsensusEngineId,
 };
 use frame_system::pallet_prelude::*;
-use hp_system::EvmHybridVMExtension;
+use hp_system::{AccountId32Mapping, AccountIdMapping, EvmHybridVMExtension, U256BalanceMapping};
 use pallet_contracts::chain_extension::SysConfig;
 use pallet_evm::{
 	AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
@@ -42,7 +43,7 @@ use sp_runtime::{
 	BuildStorage, Perbill,
 };
 
-use crate as pallet_Hybrid_vm;
+use crate as pallet_hybrid_vm;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type Balance = u128;
@@ -55,7 +56,7 @@ frame_support::construct_runtime!(
 		Randomness: pallet_insecure_randomness_collective_flip,
 		Evm: pallet_evm,
 		Contracts: pallet_contracts,
-		HybridVM: pallet_Hybrid_vm,
+		HybridVM: pallet_hybrid_vm,
 	}
 );
 
@@ -378,9 +379,38 @@ parameter_types! {
 	pub const GasLimit: u64 = 10_000_000u64;
 }
 
-impl pallet_Hybrid_vm::Config for Test {
+impl U256BalanceMapping for Test {
+	type Balance = Balance;
+	fn u256_to_balance(value: U256) -> Result<Self::Balance, &'static str> {
+		Self::Balance::try_from(value)
+	}
+}
+
+impl AccountIdMapping<Test> for Test {
+	fn into_address(account_id: <Test as frame_system::Config>::AccountId) -> H160 {
+		let mut address_arr = [0u8; 32];
+		address_arr[0..32].copy_from_slice(account_id.as_byte_slice());
+
+		H160::from_slice(&address_arr[0..20])
+	}
+}
+
+impl AccountId32Mapping<Test> for Test {
+	fn id32_to_id(id32: AccountId32) -> <Test as frame_system::Config>::AccountId {
+		id32.into()
+	}
+
+	fn id_to_id32(account_id: <Test as frame_system::Config>::AccountId) -> AccountId32 {
+		account_id.into()
+	}
+}
+
+impl pallet_hybrid_vm::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
+	type U256BalanceMapping = Self;
+	type AccountIdMapping = Self;
+	type AccountId32Mapping = Self;
 	type EnableCallEVM = EnableCallEVM;
 	type EnableCallWasmVM = EnableCallWasmVM;
 	type GasLimit = GasLimit;

@@ -1,6 +1,6 @@
 [package]
 name = "pallet-hybrid-vm"
-version = "0.2.0"
+version = "0.3.0"
 description = "Engine for Hybrid vm"
 repository.workspace = true
 edition.workspace = true
@@ -36,8 +36,8 @@ pallet-contracts = { workspace = true, default-features = false}
 pallet-evm = { workspace = true, default-features = false}
 fp-evm = { workspace = true, default-features = false}
 
-# local
-hp-system = { version = "0.1.0", path = "../../primitives/system" }
+# hybrid vm
+hp-system = { workspace = true, default-features = false }
 
 [dev-dependencies]
 assert_matches = { workspace = true }
@@ -55,7 +55,7 @@ pallet-evm-precompile-simple = { workspace = true, default-features = false}
 
 ink_env = { workspace = true }
 
-pallet-evm-precompile-call-hybrid-vm = { version = "0.1.0", path = "../evm-precompile/call-hybrid-vm" }
+pallet-evm-precompile-call-hybrid-vm = { workspace = true }
 
 [features]
 default = ["std"]
