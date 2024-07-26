@@ -16,7 +16,10 @@ scale = { package = "parity-scale-codec", version = "3.6.4", default-features = 
 scale-info = { version = "0.6", default-features = false, features = ["derive"], optional = true }
 primitive-types = { version = "0.9.0", default-features = false, features = ["codec"] }
 
+sp-core = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.11.0", default-features = false }
 sp-std = { git = "https://github.com/paritytech/polkadot-sdk", branch = "release-polkadot-v1.11.0", default-features = false }
+
+precompile-utils = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.11.0", default-features = false }
 
 [lib]
 name = "erc20"
@@ -37,6 +40,8 @@ std = [
     "scale-info/std",
     "primitive-types/std",
 	"sp-std/std",
+	"sp-core/std",
+	"precompile-utils/std",
 ]
 ink-as-dependency = []
 #ink-experimental-engine = ["ink_env/ink-experimental-engine"]

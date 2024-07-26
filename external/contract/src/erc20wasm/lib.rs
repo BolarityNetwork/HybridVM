@@ -22,14 +22,19 @@
 
 use ink_env::Environment;
 use ink_prelude::string::String;
-use sp_std::vec::Vec;
+use sp_core::H160;
+use ink_prelude::vec::Vec;
+//use sp_std::vec::Vec;
 
+type AccountId = <ink_env::DefaultEnvironment as Environment>::AccountId;
 #[ink::chain_extension( extension = 0 )]
 pub trait MyChainExtension {
         type ErrorCode = i32;
-
+		
         #[ink(function = 5, handle_status = false)]
         fn call_evm_extension(vm_input: Vec<u8>) -> String;
+		#[ink(function = 6, handle_status = false)]
+        fn h160_to_accountid(evm_address: H160) -> AccountId;
 }
 
 
@@ -59,11 +64,15 @@ mod erc20 {
     use ink::storage::Lazy;
 	use ink::storage::Mapping as StorageHashMap;
 	
+	use ink_env::{hash, ReturnFlags};
     use ink_prelude::string::String;
     use ink_prelude::string::ToString;
+	use ink_prelude::vec;
 	use ink_prelude::vec::Vec;
+	use precompile_utils::prelude::*;
+    use sp_core::U256;
 	
-
+	
     /// A simple ERC-20 contract.
     #[ink(storage)]
     pub struct Erc20 {
@@ -96,6 +105,20 @@ mod erc20 {
         spender: AccountId,
         value: Balance,
     }
+	
+	#[ink(event)]
+    pub struct SelectorError {
+        #[ink(topic)]
+        caller: AccountId,
+        selector: u32,
+    }
+	
+    #[ink(event)]
+    pub struct ParameterError {
+        #[ink(topic)]
+        caller: AccountId,
+        parameter: Vec<u8>,
+    }	
 
     /// The ERC-20 error types.
     #[derive(Debug, PartialEq, Eq)]
@@ -130,6 +153,96 @@ mod erc20 {
                 value: initial_supply,
             });
 			instance
+        }
+		
+        /// Evm ABI interface.
+        #[ink(message)]
+        pub fn evm_abi_call(&mut self, para: Vec<u8>) -> Vec<u8> {
+			let who = self.env().caller();
+
+			let mut a: [u8; 4] = Default::default();
+			a.copy_from_slice(&Self::hash_keccak_256(b"balanceOf(address)")[0..4]);
+			let balance_selector = u32::from_be_bytes(a);
+			
+			let mut a: [u8; 4] = Default::default();
+			a.copy_from_slice(&Self::hash_keccak_256(b"transfer(address,uint256)")[0..4]);
+			let transfer_selector = u32::from_be_bytes(a);
+			
+			let evm_selector = if para.len() < 4 { 0 } else {
+				let mut a: [u8; 4] = Default::default();
+				a.copy_from_slice(&para[0..4]);
+				u32::from_be_bytes(a)
+			};
+			
+			match evm_selector {
+				// 1. balanceOf(address account) external view returns (uint256);
+				// balance_of(&self, owner: AccountId) -> Balance;
+				a if a == balance_selector => {
+					let parameter = solidity::codec::decode_arguments::<Address>(&para);
+					match parameter {
+						Ok(t) => {
+							let accountid = self.env().extension().h160_to_accountid(t.0);
+
+							let return_result = self.balance_of(accountid);
+							solidity::codec::encode_arguments::<Balance>(return_result)
+						}
+						Err(_) => {
+							self.env().emit_event(ParameterError {
+                                caller: who,
+                                parameter: para,
+                            });
+							ink_env::return_value::<u8>(ReturnFlags::REVERT, &12u8);
+						}							
+					};
+				}					
+				// 2. transfer(address to, uint256 amount) external returns (bool);
+                // transfer(&mut self, to: AccountId, value: Balance) -> Result<()>
+				b if b == transfer_selector => {
+					let parameter = solidity::codec::decode_arguments::<(Address, U256)>(&para);
+					match parameter {
+						Ok(t) => {
+							let accountid = self.env().extension().h160_to_accountid(t.0.0);
+							let balance = match Balance::try_from(t.1) {
+								Ok(t) => t,
+								Err(_) => {
+							        self.env().emit_event(ParameterError {
+                                        caller: who,
+                                        parameter: para,
+                                    });
+							        ink_env::return_value::<u8>(ReturnFlags::REVERT, &1u8);									
+								}
+							};
+							let return_result = if self.transfer(accountid, balance).is_ok(){
+								true
+							} else { false };
+							solidity::codec::encode_arguments::<bool>(return_result)
+						}
+						Err(_) => {
+							self.env().emit_event(ParameterError {
+                                caller: who,
+                                parameter: para,
+                            });
+							ink_env::return_value::<u8>(ReturnFlags::REVERT, &2u8);
+						}							
+					};
+				}
+				// None
+				_ => {
+					self.env().emit_event(SelectorError {
+                        caller: who,
+                        selector: evm_selector,
+                    });
+					ink_env::return_value::<u8>(ReturnFlags::REVERT, &3u8);
+				}
+			}
+			
+			vec![]
+        }		
+
+        pub fn hash_keccak_256(input: &[u8]) -> [u8; 32] {
+            let mut output = <hash::Keccak256 as hash::HashOutput>::Type::default();
+            ink_env::hash_bytes::<hash::Keccak256>(input, &mut output);
+            output
         }
 
         /// Returns the total token supply.
