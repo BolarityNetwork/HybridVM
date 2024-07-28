@@ -1,3 +1,5 @@
+// Modified by 2024 HybridVM
+
 // This file is part of Frontier.
 
 // Copyright (C) Parity Technologies (UK) Ltd.
@@ -17,11 +19,60 @@
 
 //! Consensus extension module tests for BABE consensus.
 
+// Modified by Alex Wang 2024
+
 use super::*;
 use evm::{ExitReason, ExitRevert, ExitSucceed};
 use fp_ethereum::{TransactionData, ValidatedTransaction};
-use frame_support::{dispatch::DispatchClass, traits::Get, weights::Weight};
+use frame_support::{
+	dispatch::DispatchClass,
+	traits::{Currency, Get},
+	weights::Weight,
+};
+use hp_system::AccountIdMapping;
+use ink_env::call::{ExecutionInput, Selector};
+use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
 use pallet_evm::{AddressMapping, GasWeightMapping};
+use pallet_hybrid_vm::UnifiedAddress;
+use sha3::{Digest, Keccak256};
+use sp_runtime::codec::{Decode, Encode};
+use sp_runtime::traits::{BlakeTwo256, Hash};
+use std::error::Error;
+use std::fs::File;
+use std::io::Read;
+
+const GAS_LIMIT: u64 = 10_000u64;
+const WEIGHT_LIMIT: Weight = Weight::from_parts(1_000_000_000, u64::MAX);
+
+fn read_a_file(filename: &str) -> std::io::Result<Vec<u8>> {
+	let mut file = File::open(filename)?;
+
+	let mut data = Vec::new();
+	file.read_to_end(&mut data)?;
+
+	return Ok(data);
+}
+
+fn contract_module<T>(
+	contract_name: &str,
+	wasmtype: bool,
+) -> Result<(Vec<u8>, <T::Hashing as Hash>::Output), Box<dyn Error>>
+where
+	T: frame_system::Config,
+{
+	let contract_path = ["../hybrid-vm/fixtures/", contract_name].concat();
+	let contract_binary: Vec<u8>;
+
+	if wasmtype {
+		contract_binary = read_a_file(&contract_path)?;
+	} else {
+		let bytecode = read_a_file(&contract_path)?;
+		contract_binary = hex::decode(bytecode)?;
+	}
+
+	let code_hash = T::Hashing::hash(&contract_binary);
+	Ok((contract_binary, code_hash))
+}
 
 fn eip1559_erc20_creation_unsigned_transaction() -> EIP1559UnsignedTransaction {
 	EIP1559UnsignedTransaction {
@@ -600,5 +651,158 @@ fn proof_size_base_cost_should_keep_the_same_in_execution_and_estimate() {
 			vec![],
 		);
 		assert_eq!(estimate_tx_data.proof_size_base_cost(), tx_data.proof_size_base_cost());
+	});
+}
+
+#[test]
+fn call_hybrid_vm_works() {
+	let (pairs, mut ext) = new_test_ext_with_initial_balance(2, 1_000_000_000_000);
+	let alice = &pairs[0];
+	let bob = &pairs[1];
+	let substrate_alice =
+		<Test as pallet_evm::Config>::AddressMapping::into_account_id(alice.address);
+	let substrate_bob = <Test as pallet_evm::Config>::AddressMapping::into_account_id(bob.address);
+
+	// 1.  Get wasm and evm contract bin
+	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
+
+	ext.execute_with(|| {
+		let _ = Balances::deposit_creating(&substrate_alice, 1_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&substrate_bob, 1_000_000_000_000_000);
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<
+			<Test as frame_system::Config>::AccountId,
+		>>::minimum_balance();
+
+		// 2. Create wasm contract
+		let mut a: [u8; 4] = Default::default();
+		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);
+		let new_call = ExecutionInput::new(Selector::new(a));
+
+		let init_supply: <Test as pallet_balances::Config>::Balance = 100_000_000_000_000_000;
+		let new_call = new_call.push_arg(init_supply);
+		let creation = Contracts::instantiate_with_code(
+			RuntimeOrigin::signed(substrate_alice.clone()),
+			subsistence * 100,
+			WEIGHT_LIMIT,
+			None,
+			wasm,
+			new_call.encode(),
+			vec![],
+		);
+
+		assert_ok!(creation);
+		let wasm_addr =
+			Contracts::contract_address(&substrate_alice, &wasm_code_hash, &new_call.encode(), &[]);
+
+		//3. regist contract
+
+		assert_ok!(HybridVM::regist_contract(
+			RuntimeOrigin::signed(substrate_alice.clone()),
+			UnifiedAddress::<Test>::WasmVM(wasm_addr.clone()),
+		));
+
+		//4. Transfer Token to substrate_bob
+		let mut a: [u8; 4] = Default::default();
+		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);
+		let transfer_call = ExecutionInput::new(Selector::new(a));
+
+		let token: <Test as pallet_balances::Config>::Balance = 1_213_000_789_000_000;
+		let transfer_call = transfer_call.push_arg(&substrate_bob).push_arg(token);
+
+		let result = Contracts::bare_call(
+			substrate_alice.clone(),
+			wasm_addr.clone(),
+			0,
+			WEIGHT_LIMIT,
+			None,
+			transfer_call.encode(),
+			DebugInfo::Skip,
+			CollectEvents::Skip,
+			Determinism::Enforced,
+		)
+		.result
+		.unwrap();
+
+		assert!(!result.did_revert());
+
+		//5. Get substrate_bob balance of wasm token
+		let mut a: [u8; 4] = Default::default();
+		a.copy_from_slice(&BlakeTwo256::hash(b"balance_of")[0..4]);
+		let balance_of_call = ExecutionInput::new(Selector::new(a));
+
+		let balance_of_call = balance_of_call.push_arg(&substrate_bob);
+
+		let result = Contracts::bare_call(
+			substrate_bob.clone(),
+			wasm_addr.clone(),
+			0,
+			WEIGHT_LIMIT,
+			None,
+			//Encode::encode(&balance_of_call).to_vec(),
+			balance_of_call.encode(),
+			DebugInfo::Skip,
+			CollectEvents::Skip,
+			Determinism::Enforced,
+		)
+		.result
+		.unwrap();
+		assert!(!result.did_revert());
+
+		println!("result data before:{:?}", result);
+		let bob_balance_before = result.data;
+
+		//6.  Ethereum call hybrid vm (wasm contract) transfer wasm token to bob
+		let wasm_contract =
+			<Test as pallet_hybrid_vm::Config>::AccountIdMapping::into_address(wasm_addr.clone());
+		let transfer_selector = &Keccak256::digest(b"transfer(address,uint256)")[0..4];
+		let transfer_value: u128 = 12000000000000000000;
+
+		let call_input = [
+			&transfer_selector[..],
+			&[0u8; 12],
+			bob.address.as_fixed_bytes(),
+			&[0u8; 16],
+			&transfer_value.to_be_bytes(),
+		]
+		.concat();
+		let t = EIP1559UnsignedTransaction {
+			nonce: U256::from(2),
+			max_priority_fee_per_gas: U256::from(1),
+			max_fee_per_gas: U256::from(1),
+			gas_limit: U256::from(0x100000),
+			action: TransactionAction::Call(wasm_contract),
+			value: U256::zero(),
+			input: call_input,
+		}
+		.sign(&alice.private_key, None);
+		assert_ok!(Ethereum::execute(alice.address, &t, None,));
+
+		//7. Get bob balance of wasm token
+		let result = Contracts::bare_call(
+			substrate_bob.clone(),
+			wasm_addr.clone(),
+			0,
+			WEIGHT_LIMIT,
+			None,
+			Encode::encode(&balance_of_call).to_vec(),
+			DebugInfo::Skip,
+			CollectEvents::Skip,
+			Determinism::Enforced,
+		)
+		.result
+		.unwrap();
+		assert!(!result.did_revert());
+
+		println!("result data after:{:?}", result);
+		let bob_balance_after = result.data;
+
+		//8. Test  the balance of bob being correct
+		let after = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_after[..])
+			.unwrap()
+			.unwrap();
+		let before = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_before[..])
+			.unwrap()
+			.unwrap();
+		assert_eq!(after, before + transfer_value);
 	});
 }

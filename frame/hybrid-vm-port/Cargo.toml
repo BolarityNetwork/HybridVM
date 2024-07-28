@@ -39,6 +39,7 @@ byte-slice-cast= { workspace = true }
 hex = { workspace = true }
 libsecp256k1 = { workspace = true, features = ["static-context", "hmac"] }
 rlp = { workspace = true }
+sha3 = { workspace = true }
 # Substrate
 pallet-balances = { workspace = true, features = ["default", "insecure_zero_ed"] }
 pallet-insecure-randomness-collective-flip = { workspace = true, default-features = false}
