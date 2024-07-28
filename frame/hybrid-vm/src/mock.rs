@@ -269,13 +269,15 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainEx
 			//fn call_evm_extension(vm_input: Vec<u8>) -> String;
 			5 => HybridVM::call_evm::<E>(env),
 			//fn h160_to_accountid(evm_address: H160) -> AccountId;
-			6 => h160_to_accountid::<E>(env),  
+			6 => h160_to_accountid::<E>(env),
 			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),
 		}
 	}
 }
 
-pub fn h160_to_accountid<E: Ext<T = Test>>(env: Environment<E, InitState>) -> Result<RetVal, DispatchError> {
+pub fn h160_to_accountid<E: Ext<T = Test>>(
+	env: Environment<E, InitState>,
+) -> Result<RetVal, DispatchError> {
 	let mut envbuf = env.buf_in_buf_out();
 	let input: H160 = envbuf.read_as()?;
 	let account_id = <Test as pallet_evm::Config>::AddressMapping::into_account_id(input);
