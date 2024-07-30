@@ -26,7 +26,7 @@ use rlp::RlpStream;
 // Substrate
 use frame_support::{
 	derive_impl, parameter_types,
-	traits::{ConstU32, FindAuthor},
+	traits::{ConstU128, ConstU32, FindAuthor},
 	weights::Weight,
 	ConsensusEngineId, PalletId,
 };
@@ -101,28 +101,12 @@ impl frame_system::Config for Test {
 	type MaxConsumers = ConstU32<16>;
 }
 
-parameter_types! {
-	pub const ExistentialDeposit: u64 = 0;
-	// For weight estimation, we assume that the most locks on an individual account will be 50.
-	// This number may need to be adjusted in the future if this assumption no longer holds true.
-	pub const MaxLocks: u32 = 50;
-	pub const MaxReserves: u32 = 50;
-}
-
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type WeightInfo = ();
 	type Balance = Balance;
-	type DustRemoval = ();
-	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type ExistentialDeposit = ConstU128<1>;
 	type ReserveIdentifier = [u8; 8];
-	type FreezeIdentifier = RuntimeFreezeReason;
-	type MaxLocks = MaxLocks;
-	type MaxReserves = MaxReserves;
-	type MaxFreezes = ConstU32<1>;
+	type AccountStore = System;
 }
 
 parameter_types! {

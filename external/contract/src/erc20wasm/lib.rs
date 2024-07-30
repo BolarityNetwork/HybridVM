@@ -178,7 +178,14 @@ mod erc20 {
 				// 1. balanceOf(address account) external view returns (uint256);
 				// balance_of(&self, owner: AccountId) -> Balance;
 				a if a == balance_selector => {
-					let parameter = solidity::codec::decode_arguments::<Address>(&para);
+					if para.len() < 5 {
+						self.env().emit_event(ParameterError {
+                            caller: who,
+                            parameter: para,
+                        });
+						ink_env::return_value::<u8>(ReturnFlags::REVERT, &13u8);						
+					};
+					let parameter = solidity::codec::decode_arguments::<Address>(&para[4..]);
 					match parameter {
 						Ok(t) => {
 							let accountid = self.env().extension().h160_to_accountid(t.0);
@@ -198,7 +205,14 @@ mod erc20 {
 				// 2. transfer(address to, uint256 amount) external returns (bool);
                 // transfer(&mut self, to: AccountId, value: Balance) -> Result<()>
 				b if b == transfer_selector => {
-					let parameter = solidity::codec::decode_arguments::<(Address, U256)>(&para);
+					if para.len() < 5 {
+						self.env().emit_event(ParameterError {
+                            caller: who,
+                            parameter: para,
+                        });
+						ink_env::return_value::<u8>(ReturnFlags::REVERT, &13u8);						
+					};
+					let parameter = solidity::codec::decode_arguments::<(Address, U256)>(&para[4..]);
 					match parameter {
 						Ok(t) => {
 							let accountid = self.env().extension().h160_to_accountid(t.0.0);
