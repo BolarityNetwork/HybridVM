@@ -82,6 +82,10 @@ use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
 use pallet_evm::{AddressMapping, BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
 use pallet_hybrid_vm::UnifiedAddress;
 
+fn str2s(s: String) -> &'static str {
+	Box::leak(s.into_boxed_str())
+}
+
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode, MaxEncodedLen, TypeInfo)]
 pub enum RawOrigin {
 	EthereumTransaction(H160),
@@ -737,12 +741,18 @@ impl<T: Config> Pallet<T> {
 								CallOrCreateInfo::Call(call_info),
 							));
 						} else {
+							let mut return_code = String::from("None");
+							if return_value.data.len() > 0 {
+								return_code = return_value.data[0].to_string();
+							}
 							return Err(DispatchErrorWithPostInfo {
 								post_info: PostDispatchInfo {
 									actual_weight: Some(info.gas_consumed),
 									pays_fee: Pays::Yes,
 								},
-								error: DispatchError::from("Call wasm contract failed(REVERT)"),
+								error: DispatchError::from(str2s(
+									["Call wasm contract failed(REVERT):", &return_code].concat(),
+								)),
 							});
 						}
 					},
