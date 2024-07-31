@@ -17,7 +17,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Modified by Alex Wang
+// Modified by Alex Wang 2024
 
 use super::*;
 
@@ -1063,5 +1063,57 @@ fn test_evm_call_wasm_echo() {
 		//5. Test  whether the wasm echo result is correct
 		assert_eq!(&echo_string, "test string!");
 		assert_eq!(echo_arr[0..echo_arr_len], [231usize, 19usize, 6usize][..]);
+	});
+}
+
+// Perform test for regist_contract.
+#[test]
+fn regist_contract_works() {
+	// 1.  Get wasm bin
+	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
+
+	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {
+		let _ = Balances::deposit_creating(&ALICE_SHADOW, 10_000_000_000_000_000_000_000);
+		let _ = Balances::deposit_creating(&BOB_SHADOW, 10_000_000_000_000_000_000_000);
+		let subsistence = <pallet_balances::Pallet<Test> as Currency<AccountId>>::minimum_balance();
+
+		// 2. Create wasm contract
+		let mut a: [u8; 4] = Default::default();
+		a.copy_from_slice(&BlakeTwo256::hash(b"new")[0..4]);
+		let new_call = ExecutionInput::new(Selector::new(a));
+
+		let init_supply: <Test as pallet_balances::Config>::Balance =
+			100_000_000_000_000_000_000_000;
+		let new_call = new_call.push_arg(init_supply);
+		let creation = Contracts::instantiate_with_code(
+			RuntimeOrigin::signed(ALICE_SHADOW.clone()),
+			subsistence * 100,
+			WEIGHT_LIMIT,
+			None,
+			wasm,
+			new_call.encode(),
+			vec![],
+		);
+		let wasm_addr =
+			Contracts::contract_address(&ALICE_SHADOW, &wasm_code_hash, &new_call.encode(), &[]);
+
+		assert_ok!(creation);
+		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
+
+		assert_ok!(HybridVM::regist_contract(
+			RuntimeOrigin::signed(ALICE),
+			UnifiedAddress::<Test>::WasmVM(wasm_addr.clone()),
+		));
+		let address = <Test as pallet::Config>::AccountIdMapping::into_address(wasm_addr.clone());
+
+		expect_event(Event::RegistContract(
+			address,
+			UnifiedAddress::<Test>::WasmVM(wasm_addr.clone()),
+			ALICE,
+		));
+		assert_eq!(
+			HybridVM::hvm_contracts(address),
+			Some(UnifiedAddress::<Test>::WasmVM(wasm_addr))
+		);
 	});
 }

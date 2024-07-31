@@ -1,3 +1,5 @@
+// Modified by 2024 HybridVM
+
 // This file is part of Frontier.
 
 // Copyright (C) Parity Technologies (UK) Ltd.
@@ -17,12 +19,14 @@
 
 //! Test utilities
 
+// Modified by Alex Wang 2024
+
 use ethereum::{TransactionAction, TransactionSignature};
 use rlp::RlpStream;
 // Substrate
 use frame_support::{
 	derive_impl, parameter_types,
-	traits::{ConstU32, FindAuthor},
+	traits::{ConstU128, ConstU32, FindAuthor},
 	weights::Weight,
 	ConsensusEngineId, PalletId,
 };
@@ -48,7 +52,7 @@ use crate::IntermediateStateRoot;
 
 pub type SignedExtra = (frame_system::CheckSpecVersion<Test>,);
 
-type Balance = u64;
+type Balance = u128;
 
 frame_support::construct_runtime! {
 	pub enum Test {
@@ -88,7 +92,7 @@ impl frame_system::Config for Test {
 	type DbWeight = ();
 	type Version = ();
 	type PalletInfo = PalletInfo;
-	type AccountData = pallet_balances::AccountData<u64>;
+	type AccountData = pallet_balances::AccountData<Balance>;
 	type OnNewAccount = ();
 	type OnKilledAccount = ();
 	type SystemWeightInfo = ();
@@ -97,28 +101,12 @@ impl frame_system::Config for Test {
 	type MaxConsumers = ConstU32<16>;
 }
 
-parameter_types! {
-	pub const ExistentialDeposit: u64 = 0;
-	// For weight estimation, we assume that the most locks on an individual account will be 50.
-	// This number may need to be adjusted in the future if this assumption no longer holds true.
-	pub const MaxLocks: u32 = 50;
-	pub const MaxReserves: u32 = 50;
-}
-
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
 impl pallet_balances::Config for Test {
-	type RuntimeEvent = RuntimeEvent;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type RuntimeFreezeReason = RuntimeFreezeReason;
-	type WeightInfo = ();
-	type Balance = u64;
-	type DustRemoval = ();
-	type ExistentialDeposit = ExistentialDeposit;
-	type AccountStore = System;
+	type Balance = Balance;
+	type ExistentialDeposit = ConstU128<1>;
 	type ReserveIdentifier = [u8; 8];
-	type FreezeIdentifier = RuntimeFreezeReason;
-	type MaxLocks = MaxLocks;
-	type MaxReserves = MaxReserves;
-	type MaxFreezes = ConstU32<1>;
+	type AccountStore = System;
 }
 
 parameter_types! {
@@ -170,6 +158,16 @@ impl AddressMapping<AccountId32> for HashedAddressMapping {
 	}
 }
 
+pub struct CompactAddressMapping;
+
+impl AddressMapping<AccountId32> for CompactAddressMapping {
+	fn into_account_id(address: H160) -> AccountId32 {
+		let mut data = [0u8; 32];
+		data[0..20].copy_from_slice(&address[..]);
+		AccountId32::from(data)
+	}
+}
+
 parameter_types! {
 	pub SuicideQuickClearLimit: u32 = 0;
 }
@@ -181,7 +179,7 @@ impl pallet_evm::Config for Test {
 	type BlockHashMapping = crate::EthereumBlockHashMapping<Self>;
 	type CallOrigin = EnsureAddressTruncated;
 	type WithdrawOrigin = EnsureAddressTruncated;
-	type AddressMapping = HashedAddressMapping;
+	type AddressMapping = CompactAddressMapping;
 	type Currency = Balances;
 	type RuntimeEvent = RuntimeEvent;
 	type PrecompilesType = ();
@@ -215,9 +213,28 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainEx
 	{
 		let func_id = env.func_id();
 		match func_id {
+			//fn call_evm_extension(vm_input: Vec<u8>) -> String;
 			5 => HybridVM::call_evm::<E>(env),
+			//fn h160_to_accountid(evm_address: H160) -> AccountId;
+			6 => h160_to_accountid::<E>(env),
 			_ => Err(DispatchError::from("Passed unknown func_id to chain extension")),
 		}
+	}
+}
+
+pub fn h160_to_accountid<E: Ext<T = Test>>(
+	env: Environment<E, InitState>,
+) -> Result<RetVal, DispatchError> {
+	let mut envbuf = env.buf_in_buf_out();
+	let input: H160 = envbuf.read_as()?;
+	let account_id = <Test as pallet_evm::Config>::AddressMapping::into_account_id(input);
+	let account_id_slice = account_id.encode();
+	let output = envbuf
+		.write(&account_id_slice, false, None)
+		.map_err(|_| DispatchError::from("ChainExtension failed to write result"));
+	match output {
+		Ok(_) => return Ok(RetVal::Converging(0)),
+		Err(e) => return Err(e),
 	}
 }
 
@@ -329,7 +346,7 @@ parameter_types! {
 }
 
 impl U256BalanceMapping for Test {
-	type Balance = u64;
+	type Balance = Balance;
 	fn u256_to_balance(value: U256) -> Result<Self::Balance, &'static str> {
 		Balance::try_from(value)
 	}
@@ -477,7 +494,7 @@ pub fn new_test_ext(accounts_len: usize) -> (Vec<AccountInfo>, sp_io::TestExtern
 // our desired mockup.
 pub fn new_test_ext_with_initial_balance(
 	accounts_len: usize,
-	initial_balance: u64,
+	initial_balance: Balance,
 ) -> (Vec<AccountInfo>, sp_io::TestExternalities) {
 	// sc_cli::init_logger("");
 	let mut ext = frame_system::GenesisConfig::<Test>::default().build_storage().unwrap();

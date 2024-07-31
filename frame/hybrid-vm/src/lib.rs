@@ -109,20 +109,6 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
 		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
-		pub fn call_hybrid_vm(
-			origin: OriginFor<T>,
-			_transaction: Transaction,
-		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-
-			// Todo
-			Self::deposit_event(Event::HybridVMCalled(who));
-
-			Ok(().into())
-		}
-
-		#[pallet::call_index(1)]
-		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(1))]
 		pub fn regist_contract(
 			origin: OriginFor<T>,
 			unified_address: UnifiedAddress<T>,
