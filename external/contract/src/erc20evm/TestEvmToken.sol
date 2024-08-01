@@ -23,7 +23,7 @@ contract TestEvmToken is ERC20 {
         _mint(msg.sender, 1000000000000*1e18);
     }
 	
-	function _callWasmC(string memory input) internal returns (string memory) {
+	function _callHybridVM(string memory input) internal returns (string memory) {
 		uint inputLen = bytes(input).length + 32;  //First 32bytes is string len prefix
 		bytes memory outbytes = new bytes(1024);
 		uint gasdata = gasleft();
@@ -48,7 +48,7 @@ contract TestEvmToken is ERC20 {
 		//string input = '{"VM":"wasm", "Account":"0x' + _bytes32tohex(contractid) + '", "Fun": "transfer", "InputType": ["accountid","u128"], 
 		//"InputValue": ["0x' + _bytes32tohex(bob) + '","'+ _uint2str10(value) + '",], "OutputType":[["enum"],["0","2"],["0"]]}';
 		
-		return _callWasmC(string(input1));
+		return _callHybridVM(string(input1));
 	}
 	
 	function evmCallWasmBalance(bytes32 bob, bytes32 contractid) public returns (uint) {
@@ -62,12 +62,12 @@ contract TestEvmToken is ERC20 {
 		//string input = '{"VM":"wasm", "Account":"0x' + _bytes32tohex(contractid) + '", "Fun": "balance_of", "InputType": ["accountid"], 
 		//"InputValue": ["0x' + _bytes32tohex(bob)], "OutputType":[["u128"]]}';
 		
-		string memory result = _callWasmC(string(input1));
+		string memory result = _callHybridVM(string(input1));
 		return getResultBalance(result);
 	}
 	
 	function evmCallWasmProxy(string memory callData) public returns (string memory) {
-		return _callWasmC(callData);
+		return _callHybridVM(callData);
 	}
 	
 	function echo(string memory p,  uint[] memory u) public returns (string memory, uint[] memory) {
