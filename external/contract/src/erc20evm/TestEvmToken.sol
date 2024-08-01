@@ -1,3 +1,5 @@
+// Modified by 2024 HybridVM
+
 // Copyright (C) 2021 Cycan Technologies
 // SPDX-License-Identifier: Apache-2.0
 
@@ -12,6 +14,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
+// Modified by Alex Wang
 
 pragma solidity ^0.8.0;
 
