@@ -71,6 +71,8 @@ std = [
 	"fp-storage/std",
 	"pallet-evm/std",
 	"pallet-contracts/std",
+	"pallet-hybrid-vm/std",
+	"ink_env/std",
 ]
 runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",

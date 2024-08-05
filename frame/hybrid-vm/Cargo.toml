@@ -82,4 +82,5 @@ std = [
 	"pallet-contracts/std",
 	"pallet-evm/std",
 	"fp-evm/std",
+	"ink_env/std",
 ]
