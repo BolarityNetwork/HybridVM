@@ -29,7 +29,7 @@ fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
 # ink!
-ink_env = { workspace = true }
+ink_env = { workspace = true, features = ["no-panic-handler"] }
 #local
 pallet-hybrid-vm =  { workspace = true, default-features = false }
 hp-system =  { workspace = true, default-features = false }
