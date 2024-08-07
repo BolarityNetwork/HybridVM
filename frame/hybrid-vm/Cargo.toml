@@ -36,6 +36,9 @@ pallet-contracts = { workspace = true, default-features = false}
 pallet-evm = { workspace = true, default-features = false}
 fp-evm = { workspace = true, default-features = false}
 
+#ink
+ink_env = { workspace = true, features = ["no-panic-handler"] }
+
 # hybrid vm
 hp-system = { workspace = true, default-features = false }
 
@@ -52,8 +55,6 @@ pallet-timestamp = { workspace = true, default-features = false}
 pallet-transaction-payment = { workspace = true, default-features = false}
 
 pallet-evm-precompile-simple = { workspace = true, default-features = false}
-
-ink_env = { workspace = true }
 
 pallet-evm-precompile-call-hybrid-vm = { workspace = true }
 
@@ -82,4 +83,17 @@ std = [
 	"pallet-contracts/std",
 	"pallet-evm/std",
 	"fp-evm/std",
+	"ink_env/std",
+]
+runtime-benchmarks = [
+	"frame-support/runtime-benchmarks",
+	"frame-system/runtime-benchmarks",
+	"pallet-evm/runtime-benchmarks",
+	"pallet-contracts/runtime-benchmarks",
+]
+try-runtime = [
+	"frame-support/try-runtime",
+	"frame-system/try-runtime",
+	"pallet-evm/try-runtime",
+	"pallet-contracts/try-runtime",
 ]
