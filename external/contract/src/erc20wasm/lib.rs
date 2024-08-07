@@ -22,9 +22,7 @@
 
 use ink_env::Environment;
 use ink_prelude::string::String;
-use sp_core::H160;
 use ink_prelude::vec::Vec;
-//use sp_std::vec::Vec;
 
 type AccountId = <ink_env::DefaultEnvironment as Environment>::AccountId;
 #[ink::chain_extension( extension = 0 )]
@@ -33,8 +31,6 @@ pub trait MyChainExtension {
 		
         #[ink(function = 5, handle_status = false)]
         fn call_evm_extension(vm_input: Vec<u8>) -> String;
-		#[ink(function = 6, handle_status = false)]
-        fn h160_to_accountid(evm_address: H160) -> AccountId;
 }
 
 
@@ -64,14 +60,13 @@ mod erc20 {
     use ink::storage::Lazy;
 	use ink::storage::Mapping as StorageHashMap;
 	
-	use ink_env::{hash, ReturnFlags};
     use ink_prelude::string::String;
     use ink_prelude::string::ToString;
 	use ink_prelude::vec;
 	use ink_prelude::vec::Vec;
-	use precompile_utils::prelude::*;
-    use sp_core::U256;
 	
+	//evm_fun_abi, wasm_message_name, wasm_message_selector
+	pub type EvmABI = (String, String, Option<[u8; 4]>);
 	
     /// A simple ERC-20 contract.
     #[ink(storage)]
@@ -155,109 +150,20 @@ mod erc20 {
 			instance
         }
 		
-        /// Evm ABI interface.
+        /// Get Evm ABI interface .
         #[ink(message)]
-        pub fn evm_abi_call(&mut self, para: Vec<u8>) -> Vec<u8> {
-			let who = self.env().caller();
-
-			let mut a: [u8; 4] = Default::default();
-			a.copy_from_slice(&Self::hash_keccak_256(b"balanceOf(address)")[0..4]);
-			let balance_selector = u32::from_be_bytes(a);
+        pub fn hybridvm_evm_abi(&mut self) -> Vec<EvmABI> {
+			let mut evm_abi: Vec<EvmABI> = vec![];
+			evm_abi.push(("total_supply()returns(uint128)".to_string(), "total_supply".to_string(), None));			
+			evm_abi.push(("balanceOf(address)returns(uint128)".to_string(), "balance_of".to_string(), None));
+			evm_abi.push(("allowance(address,address)returns(uint128)".to_string(), "allowance".to_string(), None));
+			evm_abi.push(("transfer(address,uint128)returns(bool,string)".to_string(), "transfer_abi".to_string(), None));
+			evm_abi.push(("approve(address,uint128)returns(bool,string)".to_string(), "approve_abi".to_string(), None));
+			evm_abi.push(("transfer_from(address,address,uint128)returns(bool,string)".to_string(), "transfer_from_abi".to_string(), None));
+			evm_abi.push(("transfer_from_to(address,address,uint128)returns(bool,string)".to_string(), "transfer_from_to_abi".to_string(), None));
 			
-			let mut a: [u8; 4] = Default::default();
-			a.copy_from_slice(&Self::hash_keccak_256(b"transfer(address,uint256)")[0..4]);
-			let transfer_selector = u32::from_be_bytes(a);
-			
-			let evm_selector = if para.len() < 4 { 0 } else {
-				let mut a: [u8; 4] = Default::default();
-				a.copy_from_slice(&para[0..4]);
-				u32::from_be_bytes(a)
-			};
-			
-			match evm_selector {
-				// 1. balanceOf(address account) external view returns (uint256);
-				// balance_of(&self, owner: AccountId) -> Balance;
-				a if a == balance_selector => {
-					if para.len() < 5 {
-						self.env().emit_event(ParameterError {
-                            caller: who,
-                            parameter: para,
-                        });
-						ink_env::return_value::<u8>(ReturnFlags::REVERT, &13u8);						
-					};
-					let parameter = solidity::codec::decode_arguments::<Address>(&para[4..]);
-					match parameter {
-						Ok(t) => {
-							let accountid = self.env().extension().h160_to_accountid(t.0);
-
-							let return_result = self.balance_of(accountid);
-							solidity::codec::encode_arguments::<Balance>(return_result)
-						}
-						Err(_) => {
-							self.env().emit_event(ParameterError {
-                                caller: who,
-                                parameter: para,
-                            });
-							ink_env::return_value::<u8>(ReturnFlags::REVERT, &12u8);
-						}							
-					};
-				}					
-				// 2. transfer(address to, uint256 amount) external returns (bool);
-                // transfer(&mut self, to: AccountId, value: Balance) -> Result<()>
-				b if b == transfer_selector => {
-					if para.len() < 5 {
-						self.env().emit_event(ParameterError {
-                            caller: who,
-                            parameter: para,
-                        });
-						ink_env::return_value::<u8>(ReturnFlags::REVERT, &13u8);						
-					};
-					let parameter = solidity::codec::decode_arguments::<(Address, U256)>(&para[4..]);
-					match parameter {
-						Ok(t) => {
-							let accountid = self.env().extension().h160_to_accountid(t.0.0);
-							let balance = match Balance::try_from(t.1) {
-								Ok(t) => t,
-								Err(_) => {
-							        self.env().emit_event(ParameterError {
-                                        caller: who,
-                                        parameter: para,
-                                    });
-							        ink_env::return_value::<u8>(ReturnFlags::REVERT, &1u8);									
-								}
-							};
-							let return_result = if self.transfer(accountid, balance).is_ok(){
-								true
-							} else { false };
-							solidity::codec::encode_arguments::<bool>(return_result)
-						}
-						Err(_) => {
-							self.env().emit_event(ParameterError {
-                                caller: who,
-                                parameter: para,
-                            });
-							ink_env::return_value::<u8>(ReturnFlags::REVERT, &2u8);
-						}							
-					};
-				}
-				// None
-				_ => {
-					self.env().emit_event(SelectorError {
-                        caller: who,
-                        selector: evm_selector,
-                    });
-					ink_env::return_value::<u8>(ReturnFlags::REVERT, &3u8);
-				}
-			}
-			
-			vec![]
+			evm_abi
         }		
-
-        pub fn hash_keccak_256(input: &[u8]) -> [u8; 32] {
-            let mut output = <hash::Keccak256 as hash::HashOutput>::Type::default();
-            ink_env::hash_bytes::<hash::Keccak256>(input, &mut output);
-            output
-        }
 
         /// Returns the total token supply.
         #[ink(message)]
@@ -294,6 +200,22 @@ mod erc20 {
             let from = self.env().caller();
             self.transfer_from_to(from, to, value)
         }
+		
+		fn result_to_abidata(result: Result<()>) -> (bool, String) {
+           match result {
+				Ok(_) => (true, String::new()),
+				Err(e) =>  match e {
+					Error::InsufficientBalance => (false, String::from("InsufficientBalance")),
+					Error::InsufficientAllowance => (false, String::from("InsufficientAllowance")),
+					Error::OtherError(s) => (false, s),
+				}
+			}			
+		}
+		
+        #[ink(message)]
+        pub fn transfer_abi(&mut self, to: AccountId, value: Balance) -> (bool, String) {
+            Self::result_to_abidata(self.transfer(to, value))
+        }		
 
         /// Allows `spender` to withdraw from the caller's account multiple times, up to
         /// the `value` amount.
@@ -312,6 +234,11 @@ mod erc20 {
             });
             Ok(())
         }
+		
+        #[ink(message)]
+        pub fn approve_abi(&mut self, spender: AccountId, value: Balance) -> (bool, String) {
+            Self::result_to_abidata(self.approve(spender, value))
+        }				
 
         /// Transfers `value` tokens on the behalf of `from` to the account `to`.
         ///
@@ -344,6 +271,16 @@ mod erc20 {
             self.allowances.insert((from, caller), &(allowance - value));
             Ok(())
         }
+		
+        #[ink(message)]
+        pub fn transfer_from_abi(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> (bool, String) {
+            Self::result_to_abidata(self.transfer_from(from, to, value))
+        }					
 
         /// Transfers `value` amount of tokens from the caller's account to account `to`.
         ///
@@ -375,6 +312,16 @@ mod erc20 {
             });
             Ok(())
         }
+		
+        #[ink(message)]
+        pub fn transfer_from_to_abi(
+            &mut self,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> (bool, String) {
+            Self::result_to_abidata(self.transfer_from_to(from, to, value))
+        }				
 		
 		// Test call EVM contract from this contract
 		#[ink(message)]
