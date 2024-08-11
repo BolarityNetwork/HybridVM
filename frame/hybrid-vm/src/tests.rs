@@ -67,8 +67,7 @@ where
 	Ok((wasm_binary, code_hash))
 }
 
-use std::fs::File;
-use std::io::Read;
+use std::{fs::File, io::Read};
 
 fn read_a_file(filename: &str) -> std::io::Result<Vec<u8>> {
 	let mut file = File::open(filename)?;
@@ -103,7 +102,7 @@ where
 // Perform test for wasm contract  calling  EVM contract to transfer EVM ERC20 token
 #[test]
 fn test_wasm_call_evm() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -136,7 +135,7 @@ fn test_wasm_call_evm() {
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//3. Create EVM contract  and tranfer to bob token
+		// 3. Create EVM contract  and tranfer to bob token
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -212,7 +211,7 @@ fn test_wasm_call_evm() {
 		};
 		println!("Alice transfer to Bob token:{}", transfer_result);
 
-		//4. Get BOB_SHADOW balance of EVM token
+		// 4. Get BOB_SHADOW balance of EVM token
 		let balance_of_selector = &Keccak256::digest(b"balanceOf(address)")[0..4];
 
 		let source_bob = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&BOB_SHADOW)[0..20]));
@@ -253,7 +252,8 @@ fn test_wasm_call_evm() {
 		};
 		println!("bob_balance_before={}", bob_balance_before);
 
-		//5.  Call wasm contract to call evm transfer evm token to bob.  H160: evm contract address, H160: bob's address  u128: value
+		// 5. Call wasm contract to call evm transfer evm token to bob.  H160: evm contract address,
+		//    H160: bob's address  u128: value
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"wasmCallEvm")[0..4]);
 		let call = ExecutionInput::new(Selector::new(a));
@@ -281,7 +281,7 @@ fn test_wasm_call_evm() {
 		assert!(!result.did_revert());
 		println!("Alice transfer to Bob from wasm_call_evm:{}", transfer_value);
 
-		//6. Get BOB_SHADOW balance of EVM token
+		// 6. Get BOB_SHADOW balance of EVM token
 		let call4evm = <Test as pallet_evm::Config>::Runner::call(
 			source_bob,
 			evm_addr,
@@ -314,7 +314,7 @@ fn test_wasm_call_evm() {
 			},
 		};
 		println!("bob_balance_after={}", bob_balance_after);
-		//7. Test  the balance of BOB_SHADOW being correct
+		// 7. Test  the balance of BOB_SHADOW being correct
 		assert_eq!(bob_balance_after, bob_balance_before + transfer_value);
 	});
 }
@@ -322,7 +322,7 @@ fn test_wasm_call_evm() {
 // Perform test for EVM contract  calling  wasm contract to transfer wasm ERC20 token
 #[test]
 fn test_evm_call_wasm() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -378,7 +378,7 @@ fn test_evm_call_wasm() {
 
 		assert!(!result.did_revert());
 
-		//3. Create EVM contract
+		// 3. Create EVM contract
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -410,7 +410,7 @@ fn test_evm_call_wasm() {
 			},
 		}
 
-		//4. Get BOB_SHADOW balance of wasm token
+		// 4. Get BOB_SHADOW balance of wasm token
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"balance_of")[0..4]);
 		let balance_of_call = ExecutionInput::new(Selector::new(a));
@@ -436,7 +436,8 @@ fn test_evm_call_wasm() {
 		println!("result data before:{:?}", result);
 		let bob_balance_before = result.data;
 
-		//5.  Call EVM contract to call wasm contract transfer wasm token to bob,  the last bytes32 is the wasm contract accountid
+		// 5. Call EVM contract to call wasm contract transfer wasm token to bob,  the last bytes32
+		//    is the wasm contract accountid
 		let evm_call_wasm_selector =
 			&Keccak256::digest(b"evmCallWasm(bytes32,uint256,bytes32)")[0..4];
 
@@ -475,7 +476,7 @@ fn test_evm_call_wasm() {
 		assert!(&call4evm.unwrap().exit_reason.is_succeed());
 		println!("Alice transfer to Bob from evm_call_wasm:{}", transfer_value);
 
-		//6. Get BOB_SHADOW balance of wasm token
+		// 6. Get BOB_SHADOW balance of wasm token
 		let result = Contracts::bare_call(
 			BOB_SHADOW.clone(),
 			wasm_addr.clone(),
@@ -494,7 +495,7 @@ fn test_evm_call_wasm() {
 		println!("result data after:{:?}", result);
 		let bob_balance_after = result.data;
 
-		//7. Test  the balance of BOB_SHADOW being correct
+		// 7. Test  the balance of BOB_SHADOW being correct
 		let after = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_after[..])
 			.unwrap()
 			.unwrap();
@@ -508,7 +509,7 @@ fn test_evm_call_wasm() {
 // Perform test for wasm contract calling  EVM contract to get bob's EVM ERC20 token balance
 #[test]
 fn test_wasm_call_evm_balance() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -541,7 +542,7 @@ fn test_wasm_call_evm_balance() {
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//3. Create EVM contract  and tranfer to bob token
+		// 3. Create EVM contract  and tranfer to bob token
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -618,7 +619,8 @@ fn test_wasm_call_evm_balance() {
 
 		println!("Alice transfer to Bob evm result:{}, tokens:{}", transfer_result, token);
 
-		//4.  Call wasm contract to call evm for getting BOB_SHADOW balance of EVM token.  H160: evm contract address, H160: BOB_SHADOW's address
+		// 4. Call wasm contract to call evm for getting BOB_SHADOW balance of EVM token.  H160: evm
+		//    contract address, H160: BOB_SHADOW's address
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"wasmCallEvmBalance")[0..4]);
 		let call = ExecutionInput::new(Selector::new(a));
@@ -651,7 +653,7 @@ fn test_wasm_call_evm_balance() {
 				.unwrap();
 		println!("BOB_SHADOW's  evm token balance:{:?}", balance_return);
 
-		//5. Test  the evm token balance of BOB_SHADOW being correct
+		// 5. Test  the evm token balance of BOB_SHADOW being correct
 		assert_eq!(balance_return, token);
 	});
 }
@@ -659,7 +661,7 @@ fn test_wasm_call_evm_balance() {
 // Perform test for EVM contract  calling  wasm contract to get bob's wasm ERC20 token balance
 #[test]
 fn test_evm_call_wasm_balance() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -716,7 +718,7 @@ fn test_evm_call_wasm_balance() {
 		assert!(!result.did_revert());
 		println!("Alice transfer to Bob wasm token:{}", token);
 
-		//3. Create EVM contract
+		// 3. Create EVM contract
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -748,7 +750,8 @@ fn test_evm_call_wasm_balance() {
 			},
 		}
 
-		//4.  Call evm contract to call wasm for getting BOB_SHADOW balance of wasm token.  H160: BOB_SHADOW's address , the last bytes32 is the wasm contract accountid
+		// 4. Call evm contract to call wasm for getting BOB_SHADOW balance of wasm token.  H160:
+		//    BOB_SHADOW's address , the last bytes32 is the wasm contract accountid
 		let evm_call_wasm_selector =
 			&Keccak256::digest(b"evmCallWasmBalance(bytes32,bytes32)")[0..4];
 
@@ -794,15 +797,16 @@ fn test_evm_call_wasm_balance() {
 
 		println!("BOB_SHADOW's  wasm token balance:{}", bob_balance);
 
-		//5. Test  the wasm token balance of BOB_SHADOW being correct
+		// 5. Test  the wasm token balance of BOB_SHADOW being correct
 		assert_eq!(bob_balance, token);
 	});
 }
 
-// Perform test for wasm contract calling  EVM echo contract, testing parameters of different data types.
+// Perform test for wasm contract calling  EVM echo contract, testing parameters of different data
+// types.
 #[test]
 fn test_wasm_call_evm_echo() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -835,7 +839,7 @@ fn test_wasm_call_evm_echo() {
 
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//3. Create EVM contract
+		// 3. Create EVM contract
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -867,7 +871,7 @@ fn test_wasm_call_evm_echo() {
 			},
 		}
 
-		//4.  Call wasm contract to call evm using  parameters of different data types.
+		// 4. Call wasm contract to call evm using  parameters of different data types.
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"wasmCallEvmProxy")[0..4]);
 		let call = ExecutionInput::new(Selector::new(a));
@@ -912,16 +916,17 @@ fn test_wasm_call_evm_echo() {
 			i += 1;
 		}
 		println!("array:{:?}", echo_arr);
-		//5. Test  whether the evm echo result is correct
+		// 5. Test  whether the evm echo result is correct
 		assert_eq!(&echo_string, "test string!");
 		assert_eq!(echo_arr[0..echo_arr_len], [231usize, 19usize, 6usize][..]);
 	});
 }
 
-// Perform test for EVM contract calling  wasm echo contract, testing parameters of different data types.
+// Perform test for EVM contract calling  wasm echo contract, testing parameters of different data
+// types.
 #[test]
 fn test_evm_call_wasm_echo() {
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 	let (evm, _evm_code_hash) = contract_module::<Test>("erc20_evm_bytecode.txt", false).unwrap();
 
@@ -953,7 +958,7 @@ fn test_evm_call_wasm_echo() {
 		assert_ok!(creation);
 		//assert!(ContractInfoOf::<Test>::contains_key(&wasm_addr));
 
-		//3. Create EVM contract
+		// 3. Create EVM contract
 		let source = H160::from_slice(&(AsRef::<[u8; 32]>::as_ref(&ALICE_SHADOW)[0..20]));
 
 		let creation4evm = <Test as pallet_evm::Config>::Runner::create(
@@ -985,7 +990,7 @@ fn test_evm_call_wasm_echo() {
 			},
 		}
 
-		//4.  Call evm contract to call wasm  using  parameters of different data types.
+		// 4. Call evm contract to call wasm  using  parameters of different data types.
 		let evm_call_wasm_selector = &Keccak256::digest(b"evmCallWasmProxy(string)")[0..4];
 
 		let wasm_contract: [u8; 32] = wasm_addr.clone().into();
@@ -1060,7 +1065,7 @@ fn test_evm_call_wasm_echo() {
 			i += 1;
 		}
 		println!("array:{:?}", echo_arr);
-		//5. Test  whether the wasm echo result is correct
+		// 5. Test  whether the wasm echo result is correct
 		assert_eq!(&echo_string, "test string!");
 		assert_eq!(echo_arr[0..echo_arr_len], [231usize, 19usize, 6usize][..]);
 	});
@@ -1069,7 +1074,7 @@ fn test_evm_call_wasm_echo() {
 // Perform test for regist_contract.
 #[test]
 fn regist_contract_works() {
-	// 1.  Get wasm bin
+	// 1. Get wasm bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 
 	ExtBuilder::default().existential_deposit(100).build().execute_with(|| {

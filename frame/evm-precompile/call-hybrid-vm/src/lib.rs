@@ -16,8 +16,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use core::marker::PhantomData;
-use fp_evm::{ExitError, ExitSucceed, Precompile, PrecompileFailure};
-use fp_evm::{PrecompileHandle, PrecompileOutput, PrecompileResult};
+use fp_evm::{
+	ExitError, ExitSucceed, Precompile, PrecompileFailure, PrecompileHandle, PrecompileOutput,
+	PrecompileResult,
+};
 use frame_system::RawOrigin;
 use hp_system::EvmHybridVMExtension;
 use pallet_evm::AddressMapping;

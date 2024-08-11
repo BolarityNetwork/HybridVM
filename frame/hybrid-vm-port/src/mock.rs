@@ -30,12 +30,12 @@ use frame_support::{
 	weights::Weight,
 	ConsensusEngineId, PalletId,
 };
-use sp_core::crypto::UncheckedFrom;
-use sp_core::{hashing::keccak_256, ConstBool, H160, H256, U256};
+
+use sp_core::{crypto::UncheckedFrom, hashing::keccak_256, ConstBool, H160, H256, U256};
 
 use sp_runtime::{
 	traits::{BlakeTwo256, Convert, Dispatchable, IdentityLookup},
-	AccountId32, BuildStorage, Perbill,
+	AccountId32, BuildStorage, DispatchError, Perbill,
 };
 // Frontier
 use pallet_evm::{AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator};
@@ -209,7 +209,8 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainEx
 	fn call<E>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
 	where
 		E: Ext<T = Test>,
-		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
+		<E::T as frame_system::Config>::AccountId:
+			UncheckedFrom<<E::T as frame_system::Config>::Hash> + AsRef<[u8]>,
 	{
 		let func_id = env.func_id();
 		match func_id {

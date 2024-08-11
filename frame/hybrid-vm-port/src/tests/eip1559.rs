@@ -624,7 +624,7 @@ fn call_hybrid_vm_works() {
 		<Test as pallet_evm::Config>::AddressMapping::into_account_id(alice.address);
 	let substrate_bob = <Test as pallet_evm::Config>::AddressMapping::into_account_id(bob.address);
 
-	// 1.  Get wasm and evm contract bin
+	// 1. Get wasm and evm contract bin
 	let (wasm, wasm_code_hash) = contract_module::<Test>("erc20.wasm", true).unwrap();
 
 	ext.execute_with(|| {
@@ -655,14 +655,14 @@ fn call_hybrid_vm_works() {
 		let wasm_addr =
 			Contracts::contract_address(&substrate_alice, &wasm_code_hash, &new_call.encode(), &[]);
 
-		//3. regist contract
+		// 3. regist contract
 
 		assert_ok!(HybridVM::regist_contract(
 			RuntimeOrigin::signed(substrate_alice.clone()),
 			UnifiedAddress::<Test>::WasmVM(wasm_addr.clone()),
 		));
 
-		//4. Transfer Token to substrate_bob
+		// 4. Transfer Token to substrate_bob
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"transfer")[0..4]);
 		let transfer_call = ExecutionInput::new(Selector::new(a));
@@ -685,7 +685,7 @@ fn call_hybrid_vm_works() {
 		.unwrap();
 		assert!(!result.did_revert());
 
-		//5. Get substrate_bob balance of wasm token
+		// 5. Get substrate_bob balance of wasm token
 		let mut a: [u8; 4] = Default::default();
 		a.copy_from_slice(&BlakeTwo256::hash(b"balance_of")[0..4]);
 		let balance_of_call = ExecutionInput::new(Selector::new(a));
@@ -711,10 +711,10 @@ fn call_hybrid_vm_works() {
 		println!("result data before:{:?}", result);
 		let bob_balance_before = result.data;
 
-		//6.  Ethereum call hybrid vm (wasm contract) transfer wasm token to bob
+		// 6. Ethereum call hybrid vm (wasm contract) transfer wasm token to bob
 		let wasm_contract =
 			<Test as pallet_hybrid_vm::Config>::AccountIdMapping::into_address(wasm_addr.clone());
-		let transfer_selector = &Keccak256::digest(b"transfer(address,uint256)")[0..4];
+		let transfer_selector = &Keccak256::digest(b"transfer(address,uint128)")[0..4];
 		let transfer_value: u128 = 12_000_000_000_000_000;
 
 		let call_input = [
@@ -738,7 +738,7 @@ fn call_hybrid_vm_works() {
 		let result = Ethereum::transact(RawOrigin::EthereumTransaction(alice.address).into(), t);
 		assert_ok!(result);
 
-		//7. Get bob balance of wasm token
+		// 7. Get bob balance of wasm token
 		let result = Contracts::bare_call(
 			substrate_bob.clone(),
 			wasm_addr.clone(),
@@ -757,7 +757,7 @@ fn call_hybrid_vm_works() {
 		println!("result data after:{:?}", result);
 		let bob_balance_after = result.data;
 
-		//8. Test  the balance of bob being correct
+		// 8. Test  the balance of bob being correct
 		let after = <Result<u128, u8> as Decode>::decode(&mut &bob_balance_after[..])
 			.unwrap()
 			.unwrap();

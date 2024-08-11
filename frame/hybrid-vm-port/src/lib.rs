@@ -17,6 +17,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! # Ethereum pallet
+//!
+//! The Ethereum pallet works together with EVM pallet to provide full emulation
+//! for Ethereum block processing.
+
 // Modified by Alex Wang 2024
 
 //! # Hybrid-vm-port pallet
@@ -36,6 +41,8 @@ mod mock;
 #[cfg(all(feature = "std", test))]
 mod tests;
 
+mod port;
+
 use alloc::{vec, vec::Vec};
 use core::marker::PhantomData;
 pub use ethereum::{
@@ -43,7 +50,7 @@ pub use ethereum::{
 	TransactionAction, TransactionV2 as Transaction,
 };
 use ethereum_types::{Bloom, BloomInput, H160, H256, H64, U256};
-use evm::{ExitReason, ExitSucceed};
+use evm::ExitReason;
 use scale_codec::{Decode, Encode, MaxEncodedLen};
 use scale_info::TypeInfo;
 // Substrate
@@ -57,34 +64,22 @@ use frame_support::{
 use frame_system::{pallet_prelude::OriginFor, CheckWeight, WeightInfo};
 use sp_runtime::{
 	generic::DigestItem,
-	traits::{
-		BlakeTwo256, DispatchInfoOf, Dispatchable, Hash, One, Saturating, UniqueSaturatedInto, Zero,
-	},
+	traits::{DispatchInfoOf, Dispatchable, One, Saturating, UniqueSaturatedInto, Zero},
 	transaction_validity::{
 		InvalidTransaction, TransactionValidity, TransactionValidityError, ValidTransactionBuilder,
 	},
-	DispatchError, RuntimeDebug, SaturatedConversion,
+	RuntimeDebug, SaturatedConversion,
 };
 // Frontier
 use fp_consensus::{PostLog, PreLog, FRONTIER_ENGINE_ID};
 pub use fp_ethereum::TransactionData;
 use fp_ethereum::ValidatedTransaction as ValidatedTransactionT;
 use fp_evm::{
-	CallInfo, CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig,
-	TransactionValidationError, UsedGas,
+	CallOrCreateInfo, CheckEvmTransaction, CheckEvmTransactionConfig, TransactionValidationError,
 };
 pub use fp_rpc::TransactionStatus;
 use fp_storage::{EthereumStorageSchema, PALLET_ETHEREUM_SCHEMA};
-use hp_system::U256BalanceMapping;
-use ink_env::call::{ExecutionInput, Selector};
-use pallet_contracts::chain_extension::SysConfig;
-use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
-use pallet_evm::{AddressMapping, BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
-use pallet_hybrid_vm::UnifiedAddress;
-
-fn str2s(s: String) -> &'static str {
-	Box::leak(s.into_boxed_str())
-}
+use pallet_evm::{BlockHashMapping, FeeCalculator, GasWeightMapping, Runner};
 
 #[derive(Clone, Eq, PartialEq, RuntimeDebug, Encode, Decode, MaxEncodedLen, TypeInfo)]
 pub enum RawOrigin {
@@ -122,7 +117,8 @@ impl<T> Call<T>
 where
 	OriginFor<T>: Into<Result<RawOrigin, OriginFor<T>>>,
 	T: Send + Sync + Config,
-	<T as SysConfig>::RuntimeCall: Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
+	<T as frame_system::Config>::RuntimeCall:
+		Dispatchable<Info = DispatchInfo, PostInfo = PostDispatchInfo>,
 {
 	pub fn is_self_contained(&self) -> bool {
 		matches!(self, Call::transact { .. })
@@ -147,7 +143,7 @@ where
 	pub fn pre_dispatch_self_contained(
 		&self,
 		origin: &H160,
-		dispatch_info: &DispatchInfoOf<<T as SysConfig>::RuntimeCall>,
+		dispatch_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
 		len: usize,
 	) -> Option<Result<(), TransactionValidityError>> {
 		if let Call::transact { transaction } = self {
@@ -164,7 +160,7 @@ where
 	pub fn validate_self_contained(
 		&self,
 		origin: &H160,
-		dispatch_info: &DispatchInfoOf<<T as SysConfig>::RuntimeCall>,
+		dispatch_info: &DispatchInfoOf<<T as frame_system::Config>::RuntimeCall>,
 		len: usize,
 	) -> Option<TransactionValidity> {
 		if let Call::transact { transaction } = self {
@@ -260,10 +256,10 @@ pub mod pallet {
 				}
 			}
 			// Account for `on_finalize` weight:
-			//	- read: frame_system::Pallet::<T>::digest()
-			//	- read: frame_system::Pallet::<T>::block_number()
-			//	- write: <Pallet<T>>::store_block()
-			//	- write: <BlockHash<T>>::remove()
+			// 	- read: frame_system::Pallet::<T>::digest()
+			// 	- read: frame_system::Pallet::<T>::block_number()
+			// 	- write: <Pallet<T>>::store_block()
+			// 	- write: <BlockHash<T>>::remove()
 			weight.saturating_add(T::DbWeight::get().reads_writes(2, 2))
 		}
 
@@ -569,222 +565,13 @@ impl<T: Config> Pallet<T> {
 		builder.build()
 	}
 
-	fn is_hybrid_vm_transaction(transaction: Transaction) -> bool {
-		let action = {
-			match transaction {
-				Transaction::Legacy(t) => t.action,
-				Transaction::EIP2930(t) => t.action,
-				Transaction::EIP1559(t) => t.action,
-			}
-		};
-
-		match action {
-			ethereum::TransactionAction::Call(target) => {
-				if pallet_hybrid_vm::HvmContracts::<T>::contains_key(target) {
-					return true;
-				}
-			},
-			_ => {},
-		}
-
-		false
-	}
-
-	fn call_hybrid_vm(
-		source: H160,
-		transaction: Transaction,
-	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
-		let (
-			input,
-			value,
-			gas_limit,
-			_max_fee_per_gas,
-			_max_priority_fee_per_gas,
-			_nonce,
-			action,
-			_access_list,
-		) = {
-			match transaction {
-				// max_fee_per_gas and max_priority_fee_per_gas in legacy and 2930 transactions is
-				// the provided gas_price.
-				Transaction::Legacy(t) => (
-					t.input.clone(),
-					t.value,
-					t.gas_limit,
-					Some(t.gas_price),
-					Some(t.gas_price),
-					Some(t.nonce),
-					t.action,
-					Vec::new(),
-				),
-				Transaction::EIP2930(t) => {
-					let access_list: Vec<(H160, Vec<H256>)> = t
-						.access_list
-						.iter()
-						.map(|item| (item.address, item.storage_keys.clone()))
-						.collect();
-					(
-						t.input.clone(),
-						t.value,
-						t.gas_limit,
-						Some(t.gas_price),
-						Some(t.gas_price),
-						Some(t.nonce),
-						t.action,
-						access_list,
-					)
-				},
-				Transaction::EIP1559(t) => {
-					let access_list: Vec<(H160, Vec<H256>)> = t
-						.access_list
-						.iter()
-						.map(|item| (item.address, item.storage_keys.clone()))
-						.collect();
-					(
-						t.input.clone(),
-						t.value,
-						t.gas_limit,
-						Some(t.max_fee_per_gas),
-						Some(t.max_priority_fee_per_gas),
-						Some(t.nonce),
-						t.action,
-						access_list,
-					)
-				},
-			}
-		};
-
-		match action {
-			ethereum::TransactionAction::Call(target) => {
-				let vm_target = pallet_hybrid_vm::Pallet::<T>::hvm_contracts(target);
-				let target = match vm_target {
-					Some(UnifiedAddress::<T>::WasmVM(t)) => t,
-					None => {
-						return Err(DispatchErrorWithPostInfo {
-							post_info: PostDispatchInfo {
-								actual_weight: None,
-								pays_fee: Pays::Yes,
-							},
-							error: DispatchError::from("Not HybridVM Contract(REVERT)"),
-						})?;
-					},
-				};
-
-				let mut a: [u8; 4] = Default::default();
-				a.copy_from_slice(&BlakeTwo256::hash(b"evm_abi_call")[0..4]);
-				let evm_abi_call = ExecutionInput::new(Selector::new(a)).push_arg(input);
-
-				let mut gas_limit_u64 = u64::max_value();
-				if gas_limit.lt(&U256::from(gas_limit_u64)) {
-					gas_limit_u64 = gas_limit.as_u64();
-				}
-				let weight_limit: Weight =
-					<T as pallet_evm::Config>::GasWeightMapping::gas_to_weight(
-						gas_limit_u64,
-						false,
-					);
-
-				let origin = <T as pallet_evm::Config>::AddressMapping::into_account_id(source);
-				let balance_result =
-					<T as pallet_hybrid_vm::Config>::U256BalanceMapping::u256_to_balance(value);
-				let balance = match balance_result {
-					Ok(t) => t,
-					Err(_) => {
-						return Err(DispatchErrorWithPostInfo {
-							post_info: PostDispatchInfo {
-								actual_weight: None,
-								pays_fee: Pays::Yes,
-							},
-							error: DispatchError::from(
-								"Call HybridVM Contract value is error(REVERT)",
-							),
-						})?;
-					},
-				};
-
-				let info = pallet_contracts::Pallet::<T>::bare_call(
-					origin,
-					target.into(),
-					balance,
-					weight_limit,
-					None,
-					evm_abi_call.encode(),
-					DebugInfo::Skip,
-					CollectEvents::Skip,
-					Determinism::Enforced,
-				);
-				let output: Vec<u8>;
-				match info.result {
-					Ok(return_value) => {
-						if !return_value.did_revert() {
-							// because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
-							output = return_value.data[1..].iter().cloned().collect();
-							let call_info = CallInfo {
-								exit_reason: ExitReason::Succeed(ExitSucceed::Returned),
-								value: output,
-								used_gas: UsedGas {
-									standard: U256::from(
-										<T as pallet_evm::Config>::GasWeightMapping::weight_to_gas(
-											info.gas_consumed,
-										),
-									),
-									effective: U256::from(0u64),
-								},
-								weight_info: None,
-								logs: vec![],
-							};
-							return Ok((
-								PostDispatchInfo {
-									actual_weight: Some(info.gas_consumed),
-									pays_fee: Pays::Yes,
-								},
-								CallOrCreateInfo::Call(call_info),
-							));
-						} else {
-							let mut return_code = String::from("None");
-							if return_value.data.len() > 0 {
-								return_code = return_value.data[0].to_string();
-							}
-							return Err(DispatchErrorWithPostInfo {
-								post_info: PostDispatchInfo {
-									actual_weight: Some(info.gas_consumed),
-									pays_fee: Pays::Yes,
-								},
-								error: DispatchError::from(str2s(
-									["Call wasm contract failed(REVERT):", &return_code].concat(),
-								)),
-							});
-						}
-					},
-					Err(e) => {
-						return Err(DispatchErrorWithPostInfo {
-							post_info: PostDispatchInfo {
-								actual_weight: None,
-								pays_fee: Pays::Yes,
-							},
-							error: e,
-						});
-					},
-				}
-			},
-			_ => {
-				return Err(DispatchErrorWithPostInfo {
-					post_info: PostDispatchInfo { actual_weight: None, pays_fee: Pays::Yes },
-					error: DispatchError::from("Not HybridVM Contract Call(REVERT)"),
-				});
-			},
-		}
-	}
-
 	fn apply_validated_transaction(
 		source: H160,
 		transaction: Transaction,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
-		//firstly, check if it's the ethereum transaction or HybridVM transaction
 		if Self::is_hybrid_vm_transaction(transaction.clone()) {
 			return Self::call_hybrid_vm(source, transaction);
 		}
-
 		let (to, _, info) = Self::execute(source, &transaction, None)?;
 
 		let pending = Pending::<T>::get();

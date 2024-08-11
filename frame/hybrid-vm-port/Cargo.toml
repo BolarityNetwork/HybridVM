@@ -1,6 +1,6 @@
 [package]
 name = "pallet-hybrid-vm-port"
-version = "0.3.0"
+version = "0.4.0"
 license = "Apache-2.0"
 description = "HybridVM port pallet for HybridVM."
 edition = { workspace = true }
@@ -28,6 +28,7 @@ fp-evm = { workspace = true }
 fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
+precompile-utils = { workspace = true }
 # ink!
 ink_env = { workspace = true, features = ["no-panic-handler"] }
 #local
@@ -72,6 +73,7 @@ std = [
 	"fp-storage/std",
 	"pallet-evm/std",
 	"pallet-contracts/std",
+	"precompile-utils/std",
 ]
 runtime-benchmarks = [
 	"frame-support/runtime-benchmarks",

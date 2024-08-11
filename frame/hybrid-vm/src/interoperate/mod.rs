@@ -25,14 +25,16 @@ use alloc::string::{String, ToString};
 
 use codec::{Decode, Encode};
 use core::fmt;
-use sp_std::vec;
-use sp_std::vec::Vec;
-use sp_std::{prelude::*, str};
+use sp_std::{prelude::*, str, vec, vec::Vec};
 
-use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
-use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
-use sp_runtime::app_crypto::sp_core::{H160, U256};
-use sp_runtime::DispatchError;
+use pallet_contracts::{
+	chain_extension::{Environment, Ext, InitState, RetVal},
+	CollectEvents, DebugInfo, Determinism,
+};
+use sp_runtime::{
+	app_crypto::sp_core::{H160, U256},
+	DispatchError,
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -112,7 +114,8 @@ impl<T: Config> InterCall<T> {
 		match info.result {
 			Ok(return_value) => {
 				if !return_value.did_revert() {
-					// because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
+					// because return_value.data = MessageResult<T, E>, so, the first byte is zhe
+					// Ok() Code, be removed
 					output = vm_codec::wasm_decode(
 						&data[32..].iter().cloned().collect(),
 						&return_value.data[1..].iter().cloned().collect(),
@@ -234,13 +237,11 @@ impl fmt::Display for CustomError {
 pub mod vm_codec {
 	use super::*;
 
-	use codec::Compact;
-	use codec::Encode;
+	use codec::{Compact, Encode};
 	use core::mem::size_of;
 	use sha3::{Digest, Keccak256};
 	use sp_runtime::{traits::BlakeTwo256, AccountId32};
-	use sp_std::convert::TryInto;
-	use sp_std::str::FromStr;
+	use sp_std::{convert::TryInto, str::FromStr};
 
 	type Result<T> = sp_std::result::Result<T, CustomError>;
 
@@ -289,10 +290,10 @@ pub mod vm_codec {
 		let mut data_ex: Vec<u8> = Vec::new();
 		let mut i: usize = 0;
 
-		// 256 bit for per fix parameter,  dyn parameter occupy 256bit offset value, and value add after all fix paramter
-		// dyn parameter in offset one 256bit length value, and after real value
-		// uint int using big endian, and patch 0 in high bit.  else for address byte patch 0 in low bit.
-		// array's inputValue: len, v1,v2, ..., vlen.
+		// 256 bit for per fix parameter,  dyn parameter occupy 256bit offset value, and value add
+		// after all fix paramter dyn parameter in offset one 256bit length value, and after real
+		// value uint int using big endian, and patch 0 in high bit.  else for address byte patch
+		// 0 in low bit. array's inputValue: len, v1,v2, ..., vlen.
 		for p in call_vm.InputType {
 			let value = call_vm.InputValue.get(i).ok_or(CustomError::new("Data number error"))?;
 			let mut value_data: Vec<u8> = Vec::new();
@@ -628,10 +629,10 @@ pub mod vm_codec {
 		let mut data: Vec<u8> = Vec::new();
 		let mut i: usize = 0;
 
-		// scale codec LE: fixlength per fixed-width parameter,  dyn parameter: prefixed with a compact encoding of the number of items
-		// compact integer with compact encoding: 00--one byte  01--two bytes  10--four bytes  11--big number
-		//    The upper six bits are the number of bytes following
-		// list inputValue: Vector u8 u8 u8    "3", "12","34","56"
+		// scale codec LE: fixlength per fixed-width parameter,  dyn parameter: prefixed with a
+		// compact encoding of the number of items compact integer with compact encoding: 00--one
+		// byte  01--two bytes  10--four bytes  11--big number    The upper six bits are the
+		// number of bytes following list inputValue: Vector u8 u8 u8    "3", "12","34","56"
 		for p in call_vm.InputType {
 			let value = call_vm.InputValue.get(i).ok_or(CustomError::new("Data number error"))?;
 			let mut value_data: Vec<u8> = Vec::new();
@@ -649,7 +650,9 @@ pub mod vm_codec {
 				//"f32" => value_data.append(&mut to_scale::<f32>(&value)),
 				//"f64" => value_data.append(&mut to_scale::<f64>(&value)),
 				"bool" => value_data.append(&mut to_scale::<u8>(&value)), // false: 00 true: 01
-				"enum" => value_data.append(&mut to_scale::<u8>(&value)), //Option  Result are enum: None 00  Some 01   Ok 00  Err 01
+				"enum" => value_data.append(&mut to_scale::<u8>(&value)), /* Option  Result are
+				                                                            * enum: None 00  Some
+				                                                            * 01   Ok 00  Err 01 */
 				//Option<bool> : None 00  Some true 01  Some false 02
 				"char" => {
 					let c = value.chars().next().ok_or(CustomError::new("Char value error"))?;
@@ -687,9 +690,11 @@ pub mod vm_codec {
 		ret
 	}
 
-	//number 0 Vec<string> , when it has Vector or Enum type, then the number 0+1 Vec<string> it set number x Vec<string>, Vec has detail info and Enum has index nmber x of the second Vec<string> means 00:vec   01:vec
-	//example Vec   [ ...  "10", ...]   10th ["u8","string"...]  "0" means none
-	//example Enum  [ ...  "13", ...]   13th ["16","17","18"]    16th ["u8","string"] "0" means none  index is the index position's type
+	//number 0 Vec<string> , when it has Vector or Enum type, then the number 0+1 Vec<string> it
+	// set number x Vec<string>, Vec has detail info and Enum has index nmber x of the second
+	// Vec<string> means 00:vec   01:vec example Vec   [ ...  "10", ...]   10th ["u8","string"...]
+	// "0" means none example Enum  [ ...  "13", ...]   13th ["16","17","18"]    16th
+	// ["u8","string"] "0" means none  index is the index position's type
 	pub fn wasm_decode(
 		input: &Vec<u8>,
 		output: &Vec<u8>,
@@ -798,7 +803,8 @@ pub mod vm_codec {
 						}
 					}
 				},
-				//Option  Result are enum: None 00 Some 01, Ok00 Err01; Option<bool> : None 00  Some true 01  Some false 02
+				//Option  Result are enum: None 00 Some 01, Ok00 Err01; Option<bool> : None 00
+				// Some true 01  Some false 02
 				"enum" => {
 					let a = output[*offset] as usize;
 					call_return.ReturnValue.push(to_string_value::<u8>(&output, offset));
@@ -876,7 +882,8 @@ pub mod vm_codec {
 				let val_bytes = [a, output[*offset + 1], output[*offset + 2], output[*offset + 3]];
 				val = u32::from_le_bytes(val_bytes) as usize;
 			},
-			_ => return Err(CustomError::new("Not support.")), //ob11 not support, which up six is the bignumber length.
+			_ => return Err(CustomError::new("Not support.")), /* ob11 not support, which up six
+			                                                    * is the bignumber length. */
 		}
 
 		b = b * 2;

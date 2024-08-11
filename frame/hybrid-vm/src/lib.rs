@@ -23,15 +23,22 @@ mod tests;
 mod interoperate;
 
 use self::interoperate::InterCall;
-use frame_support::traits::{tokens::fungible::Inspect, ConstU32, Currency, Get};
-use frame_support::{weights::Weight, RuntimeDebugNoBound};
+use frame_support::{
+	traits::{tokens::fungible::Inspect, ConstU32, Currency, Get},
+	weights::Weight,
+	RuntimeDebugNoBound,
+};
 use ink_env::call::{ExecutionInput, Selector};
-use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
-use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
+use pallet_contracts::{
+	chain_extension::{Environment, Ext, InitState, RetVal},
+	CollectEvents, DebugInfo, Determinism,
+};
 use sha3::{Digest, Keccak256};
 use sp_core::{H160, U256};
-use sp_runtime::traits::{BlakeTwo256, Hash};
-use sp_runtime::{AccountId32, BoundedVec, DispatchError};
+use sp_runtime::{
+	traits::{BlakeTwo256, Hash},
+	AccountId32, BoundedVec, DispatchError,
+};
 use sp_std::vec::Vec;
 //use sp_std::fmt::Debug;
 use hp_system::{AccountId32Mapping, AccountIdMapping, U256BalanceMapping};
@@ -128,7 +135,7 @@ pub mod pallet {
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
-		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(2))]
+		#[pallet::weight(Weight::from_parts(10_000, 0) + T::DbWeight::get().writes(3))]
 		pub fn regist_contract(
 			origin: OriginFor<T>,
 			unified_address: UnifiedAddress<T>,
@@ -152,21 +159,22 @@ pub mod pallet {
 						CollectEvents::Skip,
 						Determinism::Enforced,
 					)
-					.result
-					.unwrap_or(return Err(Error::<T>::NoWasmContractOrCallError.into()));
+					.result?;
 
 					if result.did_revert() {
 						return Err(Error::<T>::WasmContractRevert.into());
 					}
 
 					let evm_abi = <Result<Vec<EvmABI>> as Decode>::decode(&mut &result.data[..])
-						.unwrap_or(return Err(Error::<T>::EvmABIDecodeError.into()))
-						.unwrap_or(return Err(Error::<T>::EvmABIDecodeError.into()));
+						.map_err(|_| DispatchError::from(Error::<T>::EvmABIDecodeError))?
+						.map_err(|_| DispatchError::from(Error::<T>::EvmABIDecodeError))?;
 
 					let mut abi_info: Vec<(u32, FunABI)> = vec![];
 					for abi in evm_abi {
-						let index =
-							abi.0.find(')').unwrap_or(return Err(Error::<T>::EvmABIError.into()));
+						let index = abi
+							.0
+							.find(')')
+							.ok_or::<DispatchError>(Error::<T>::EvmABIError.into())?;
 						let mut a: [u8; 4] = Default::default();
 						a.copy_from_slice(&Keccak256::digest(abi.0[0..index + 1].as_bytes())[0..4]);
 						let selector = u32::from_be_bytes(a);
@@ -187,9 +195,8 @@ pub mod pallet {
 					let address = T::AccountIdMapping::into_address(account);
 
 					HvmContracts::<T>::insert(address, unified_address.clone());
-					//if EvmABInfo::<T>::contains_prefix(address) {
 					_ = EvmABInfo::<T>::clear_prefix(address, 10000, None);
-					//}
+
 					for abi in abi_info {
 						EvmABInfo::<T>::insert(address, abi.0, abi.1);
 					}
