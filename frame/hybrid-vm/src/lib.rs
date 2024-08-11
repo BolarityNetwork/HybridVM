@@ -37,11 +37,11 @@ use sha3::{Digest, Keccak256};
 use sp_core::{H160, U256};
 use sp_runtime::{
 	traits::{BlakeTwo256, Hash},
-	AccountId32, BoundedVec, DispatchError,
+	BoundedVec, DispatchError,
 };
 use sp_std::vec::Vec;
 //use sp_std::fmt::Debug;
-use hp_system::{AccountId32Mapping, AccountIdMapping, U256BalanceMapping};
+use hp_system::{AccountIdMapping, U256BalanceMapping};
 
 pub use self::pallet::*;
 
@@ -77,8 +77,6 @@ pub mod pallet {
 		type U256BalanceMapping: U256BalanceMapping<Balance = <<Self as pallet_contracts::Config>::Currency as Inspect<Self::AccountId>>::Balance>;
 
 		type AccountIdMapping: AccountIdMapping<Self>;
-
-		type AccountId32Mapping: AccountId32Mapping<Self>;
 
 		#[pallet::constant]
 		type EnableCallEVM: Get<bool>;
@@ -208,10 +206,7 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> Pallet<T>
-	where
-		T::AccountId: From<AccountId32> + Into<AccountId32>,
-	{
+	impl<T: Config> Pallet<T> {
 		pub fn call_wasm_vm(
 			origin: OriginFor<T>,
 			data: Vec<u8>,

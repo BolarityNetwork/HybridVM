@@ -39,7 +39,6 @@ use sp_runtime::{
 use serde::{Deserialize, Serialize};
 
 use fp_evm::ExecutionInfoV2;
-use frame_support::sp_runtime::AccountId32;
 use pallet_evm::Runner;
 
 use super::*;
@@ -87,7 +86,7 @@ impl<T: Config> InterCall<T> {
 		}
 
 		let input: Vec<u8>;
-		let target: AccountId32;
+		let target: Vec<u8>;
 
 		match vm_codec::wasm_encode(&data[32..].iter().cloned().collect()) {
 			Ok(r) => (input, target) = r,
@@ -97,7 +96,8 @@ impl<T: Config> InterCall<T> {
 		let gas_limit: Weight = target_gas;
 
 		let origin = ensure_signed(origin)?;
-		let target = T::AccountId32Mapping::id32_to_id(target);
+		let target = <T as frame_system::Config>::AccountId::decode(&mut target.as_slice())
+			.map_err(|e| DispatchError::from(str2s(e.to_string())))?;
 
 		let info = pallet_contracts::Pallet::<T>::bare_call(
 			origin,
@@ -240,7 +240,7 @@ pub mod vm_codec {
 	use codec::{Compact, Encode};
 	use core::mem::size_of;
 	use sha3::{Digest, Keccak256};
-	use sp_runtime::{traits::BlakeTwo256, AccountId32};
+	use sp_runtime::traits::BlakeTwo256;
 	use sp_std::{convert::TryInto, str::FromStr};
 
 	type Result<T> = sp_std::result::Result<T, CustomError>;
@@ -618,13 +618,10 @@ pub mod vm_codec {
 		Ok(String::encode(&return_json))
 	}
 
-	pub fn wasm_encode(input: &Vec<u8>) -> Result<(Vec<u8>, AccountId32)> {
+	pub fn wasm_encode(input: &Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
 		let call_vm: CallVM = t!(serde_json::from_slice(input.as_slice()));
 		let account = call_vm.Account;
-		let mut bytes = [0u8; 32];
-		let target = t!(hex::decode_to_slice(&account[2..], &mut bytes)
-			.map_err(|_| "invalid hex address.")
-			.map(|_| AccountId32::from(bytes)));
+		let target = t!(hex::decode(&account[2..]).map_err(|_| "invalid hex address."));
 		let selector = &<BlakeTwo256 as sp_core::Hasher>::hash(call_vm.Fun.as_bytes())[0..4];
 		let mut data: Vec<u8> = Vec::new();
 		let mut i: usize = 0;

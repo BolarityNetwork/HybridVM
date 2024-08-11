@@ -27,7 +27,7 @@ use frame_support::{
 	ConsensusEngineId,
 };
 use frame_system::pallet_prelude::*;
-use hp_system::{AccountId32Mapping, AccountIdMapping, EvmHybridVMExtension, U256BalanceMapping};
+use hp_system::{AccountIdMapping, EvmHybridVMExtension, U256BalanceMapping};
 use pallet_contracts::chain_extension::SysConfig;
 use pallet_evm::{
 	AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator, GasWeightMapping,
@@ -183,11 +183,11 @@ where
 
 pub struct CompactAddressMapping;
 
-impl AddressMapping<AccountId32> for CompactAddressMapping {
-	fn into_account_id(address: H160) -> AccountId32 {
+impl AddressMapping<AccountId> for CompactAddressMapping {
+	fn into_account_id(address: H160) -> AccountId {
 		let mut data = [0u8; 32];
 		data[0..20].copy_from_slice(&address[..]);
-		AccountId32::from(data)
+		AccountId::from(data)
 	}
 }
 
@@ -323,7 +323,7 @@ parameter_types! {
 }
 
 pub struct EnsureAccount<T, A>(sp_std::marker::PhantomData<(T, A)>);
-impl<T: Config, A: sp_core::Get<Option<AccountId32>>>
+impl<T: Config, A: sp_core::Get<Option<AccountId>>>
 	EnsureOrigin<<T as frame_system::Config>::RuntimeOrigin> for EnsureAccount<T, A>
 where
 	<T as frame_system::Config>::AccountId: From<AccountId32>,
@@ -414,22 +414,11 @@ impl AccountIdMapping<Test> for Test {
 	}
 }
 
-impl AccountId32Mapping<Test> for Test {
-	fn id32_to_id(id32: AccountId32) -> <Test as frame_system::Config>::AccountId {
-		id32.into()
-	}
-
-	fn id_to_id32(account_id: <Test as frame_system::Config>::AccountId) -> AccountId32 {
-		account_id.into()
-	}
-}
-
 impl pallet_hybrid_vm::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type U256BalanceMapping = Self;
 	type AccountIdMapping = Self;
-	type AccountId32Mapping = Self;
 	type EnableCallEVM = EnableCallEVM;
 	type EnableCallWasmVM = EnableCallWasmVM;
 	type GasLimit = GasLimit;
@@ -443,8 +432,8 @@ const B: [u8; 32] = [
 	2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 5, 5, 6, 6, 6, 6, 6, 7, 7, 7, 7, 7, 8, 8,
 ];
 
-pub const ALICE: AccountId32 = AccountId32::new(A);
-pub const BOB: AccountId32 = AccountId32::new(B);
+pub const ALICE: AccountId = AccountId::new(A);
+pub const BOB: AccountId = AccountId::new(B);
 
 const A_SHADOW: [u8; 32] = [
 	1, 1, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -454,8 +443,8 @@ const B_SHADOW: [u8; 32] = [
 ];
 // Account shadow is the account which data is the source account data with the last 12 bytes
 // setting zero
-pub const ALICE_SHADOW: AccountId32 = AccountId32::new(A_SHADOW);
-pub const BOB_SHADOW: AccountId32 = AccountId32::new(B_SHADOW);
+pub const ALICE_SHADOW: AccountId = AccountId::new(A_SHADOW);
+pub const BOB_SHADOW: AccountId = AccountId::new(B_SHADOW);
 
 pub struct ExtBuilder {
 	existential_deposit: u64,
