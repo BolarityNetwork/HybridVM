@@ -629,7 +629,7 @@ fn call_hybrid_vm_works() {
 		// 6. Ethereum call hybrid vm (wasm contract) transfer wasm token to bob
 		let wasm_contract =
 			<Test as pallet_hybrid_vm::Config>::AccountIdMapping::into_address(wasm_addr.clone());
-		let transfer_selector = &Keccak256::digest(b"transfer(address,uint128)")[0..4];
+		let transfer_selector = &Keccak256::digest(b"transfer(address,uint256)")[0..4];
 		let transfer_value: u128 = 12_000_000_000_000_000;
 
 		let call_input = [

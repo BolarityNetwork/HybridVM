@@ -64,6 +64,7 @@ mod erc20 {
     use ink_prelude::string::ToString;
 	use ink_prelude::vec;
 	use ink_prelude::vec::Vec;
+	use sp_core::U256;
 	
 	//evm_fun_abi, wasm_message_name, wasm_message_selector
 	pub type EvmABI = (String, String, Option<[u8; 4]>);
@@ -154,13 +155,12 @@ mod erc20 {
         #[ink(message)]
         pub fn hybridvm_evm_abi(&mut self) -> Vec<EvmABI> {
 			let mut evm_abi: Vec<EvmABI> = vec![];
-			evm_abi.push(("total_supply()returns(uint128)".to_string(), "total_supply".to_string(), None));			
-			evm_abi.push(("balanceOf(address)returns(uint128)".to_string(), "balance_of".to_string(), None));
-			evm_abi.push(("allowance(address,address)returns(uint128)".to_string(), "allowance".to_string(), None));
-			evm_abi.push(("transfer(address,uint128)returns(bool,string)".to_string(), "transfer_abi".to_string(), None));
-			evm_abi.push(("approve(address,uint128)returns(bool,string)".to_string(), "approve_abi".to_string(), None));
-			evm_abi.push(("transfer_from(address,address,uint128)returns(bool,string)".to_string(), "transfer_from_abi".to_string(), None));
-			evm_abi.push(("transfer_from_to(address,address,uint128)returns(bool,string)".to_string(), "transfer_from_to_abi".to_string(), None));
+			evm_abi.push(("totalSupply()returns(uint256)".to_string(), "total_supply_abi".to_string(), None));			
+			evm_abi.push(("balanceOf(address)returns(uint256)".to_string(), "balance_of_abi".to_string(), None));
+			evm_abi.push(("allowance(address,address)returns(uint256)".to_string(), "allowance_abi".to_string(), None));
+			evm_abi.push(("transfer(address,uint256)returns(bool)".to_string(), "transfer_abi".to_string(), None));
+			evm_abi.push(("approve(address,uint256)returns(bool)".to_string(), "approve_abi".to_string(), None));
+			evm_abi.push(("transferFrom(address,address,uint256)returns(bool)".to_string(), "transfer_from_abi".to_string(), None));
 			
 			evm_abi
         }		
@@ -170,6 +170,11 @@ mod erc20 {
         pub fn total_supply(&self) -> Balance {
             self.total_supply
         }
+		
+        #[ink(message)]
+        pub fn total_supply_abi(&self) -> U256 {
+            self.total_supply.into()
+        }		
 
         /// Returns the account balance for the specified `owner`.
         ///
@@ -178,6 +183,11 @@ mod erc20 {
         pub fn balance_of(&self, owner: AccountId) -> Balance {
             self.balances.get(&owner).unwrap_or(0)
         }
+		
+        #[ink(message)]
+        pub fn balance_of_abi(&self, owner: AccountId) -> U256 {
+            self.balances.get(&owner).unwrap_or(0).into()
+        }		
 
         /// Returns the amount which `spender` is still allowed to withdraw from `owner`.
         ///
@@ -186,6 +196,11 @@ mod erc20 {
         pub fn allowance(&self, owner: AccountId, spender: AccountId) -> Balance {
             self.allowances.get(&(owner, spender)).unwrap_or(0)
         }
+		
+        #[ink(message)]
+        pub fn allowance_abi(&self, owner: AccountId, spender: AccountId) -> U256 {
+            self.allowances.get(&(owner, spender)).unwrap_or(0).into()
+        }		
 
         /// Transfers `value` amount of tokens from the caller's account to account `to`.
         ///
@@ -200,21 +215,11 @@ mod erc20 {
             let from = self.env().caller();
             self.transfer_from_to(from, to, value)
         }
-		
-		fn result_to_abidata(result: Result<()>) -> (bool, String) {
-           match result {
-				Ok(_) => (true, String::new()),
-				Err(e) =>  match e {
-					Error::InsufficientBalance => (false, String::from("InsufficientBalance")),
-					Error::InsufficientAllowance => (false, String::from("InsufficientAllowance")),
-					Error::OtherError(s) => (false, s),
-				}
-			}			
-		}
-		
+				
         #[ink(message)]
-        pub fn transfer_abi(&mut self, to: AccountId, value: Balance) -> (bool, String) {
-            Self::result_to_abidata(self.transfer(to, value))
+        pub fn transfer_abi(&mut self, to: AccountId, value: U256) -> bool {
+			let Ok(value) = Balance::try_from(value) else { return false };
+            self.transfer(to, value).is_ok()
         }		
 
         /// Allows `spender` to withdraw from the caller's account multiple times, up to
@@ -236,8 +241,9 @@ mod erc20 {
         }
 		
         #[ink(message)]
-        pub fn approve_abi(&mut self, spender: AccountId, value: Balance) -> (bool, String) {
-            Self::result_to_abidata(self.approve(spender, value))
+        pub fn approve_abi(&mut self, spender: AccountId, value: U256) -> bool {
+		    let Ok(value) = Balance::try_from(value) else { return false };
+            self.approve(spender, value).is_ok()
         }				
 
         /// Transfers `value` tokens on the behalf of `from` to the account `to`.
@@ -277,9 +283,10 @@ mod erc20 {
             &mut self,
             from: AccountId,
             to: AccountId,
-            value: Balance,
-        ) -> (bool, String) {
-            Self::result_to_abidata(self.transfer_from(from, to, value))
+            value: U256,
+        ) -> bool {
+			let Ok(value) = Balance::try_from(value) else { return false };
+            self.transfer_from(from, to, value).is_ok()
         }					
 
         /// Transfers `value` amount of tokens from the caller's account to account `to`.
@@ -312,17 +319,7 @@ mod erc20 {
             });
             Ok(())
         }
-		
-        #[ink(message)]
-        pub fn transfer_from_to_abi(
-            &mut self,
-            from: AccountId,
-            to: AccountId,
-            value: Balance,
-        ) -> (bool, String) {
-            Self::result_to_abidata(self.transfer_from_to(from, to, value))
-        }				
-		
+			
 		// Test call EVM contract from this contract
 		#[ink(message)]
         pub fn wasmCallEvm(
