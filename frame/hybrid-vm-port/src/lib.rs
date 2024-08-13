@@ -570,7 +570,7 @@ impl<T: Config> Pallet<T> {
 		transaction: Transaction,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
 		if Self::is_hybrid_vm_transaction(transaction.clone()) {
-			return Self::call_hybrid_vm(source, transaction);
+			return Self::call_hybrid_vm(source, TransactionData::from(&transaction));
 		}
 		let (to, _, info) = Self::execute(source, &transaction, None)?;
 

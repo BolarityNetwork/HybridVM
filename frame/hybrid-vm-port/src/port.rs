@@ -219,7 +219,7 @@ impl<T: Config> Pallet<T> {
 
 	pub fn call_hybrid_vm(
 		source: H160,
-		transaction: Transaction,
+		t: TransactionData,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
 		let (
 			input,
@@ -230,56 +230,16 @@ impl<T: Config> Pallet<T> {
 			_nonce,
 			action,
 			_access_list,
-		) = {
-			match transaction {
-				// max_fee_per_gas and max_priority_fee_per_gas in legacy and 2930 transactions is
-				// the provided gas_price.
-				Transaction::Legacy(t) => (
-					t.input.clone(),
-					t.value,
-					t.gas_limit,
-					Some(t.gas_price),
-					Some(t.gas_price),
-					Some(t.nonce),
-					t.action,
-					Vec::new(),
-				),
-				Transaction::EIP2930(t) => {
-					let access_list: Vec<(H160, Vec<H256>)> = t
-						.access_list
-						.iter()
-						.map(|item| (item.address, item.storage_keys.clone()))
-						.collect();
-					(
-						t.input.clone(),
-						t.value,
-						t.gas_limit,
-						Some(t.gas_price),
-						Some(t.gas_price),
-						Some(t.nonce),
-						t.action,
-						access_list,
-					)
-				},
-				Transaction::EIP1559(t) => {
-					let access_list: Vec<(H160, Vec<H256>)> = t
-						.access_list
-						.iter()
-						.map(|item| (item.address, item.storage_keys.clone()))
-						.collect();
-					(
-						t.input.clone(),
-						t.value,
-						t.gas_limit,
-						Some(t.max_fee_per_gas),
-						Some(t.max_priority_fee_per_gas),
-						Some(t.nonce),
-						t.action,
-						access_list,
-					)
-				},
-			}
-		};
+		) = (
+			t.input,
+			t.value,
+			t.gas_limit,
+			t.max_fee_per_gas,
+			t.max_priority_fee_per_gas,
+			t.nonce,
+			t.action,
+			t.access_list,
+		);
 
 		match action {
 			ethereum::TransactionAction::Call(target) => {
