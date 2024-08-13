@@ -569,9 +569,6 @@ impl<T: Config> Pallet<T> {
 		source: H160,
 		transaction: Transaction,
 	) -> Result<(PostDispatchInfo, CallOrCreateInfo), DispatchErrorWithPostInfo> {
-		if Self::is_hybrid_vm_transaction(transaction.clone()) {
-			return Self::call_hybrid_vm(source, TransactionData::from(&transaction));
-		}
 		let (to, _, info) = Self::execute(source, &transaction, None)?;
 
 		let pending = Pending::<T>::get();
@@ -731,6 +728,10 @@ impl<T: Config> Pallet<T> {
 		let (weight_limit, proof_size_base_cost) = Self::transaction_weight(&transaction_data);
 		let is_transactional = true;
 		let validate = false;
+
+		if Self::is_hybrid_vm_transaction(transaction.clone()) {
+			return Self::call_hybrid_vm(from, transaction_data);
+		}
 
 		let (
 			input,
