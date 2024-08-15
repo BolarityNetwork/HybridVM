@@ -29,8 +29,7 @@ fp-rpc = { workspace = true }
 fp-storage = { workspace = true }
 pallet-evm = { workspace = true }
 precompile-utils = { workspace = true }
-# ink!
-ink_env = { workspace = true, features = ["no-panic-handler"] }
+
 #local
 pallet-hybrid-vm =  { workspace = true, default-features = false }
 hp-system =  { workspace = true, default-features = false }
@@ -49,6 +48,8 @@ sp-core = { workspace = true, features = ["default"] }
 sp-std = { workspace = true, features = ["default"] }
 # Frontier
 fp-self-contained = { workspace = true, features = ["default"] }
+# ink!
+ink_env = { workspace = true, features = ["no-panic-handler"] }
 
 [features]
 default = ["std"]
