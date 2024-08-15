@@ -680,6 +680,11 @@ impl<T: Config> Pallet<T> {
 			}
 		};
 
+		let pay = match Self::is_hybrid_vm_transaction(transaction.clone()) {
+			true => Pays::Yes,
+			_ => Pays::No,
+		};
+
 		Pending::<T>::append((transaction, status, receipt));
 
 		Self::deposit_event(Event::Executed {
@@ -707,7 +712,7 @@ impl<T: Config> Pallet<T> {
 					}
 					Some(gas_to_weight)
 				},
-				pays_fee: Pays::No,
+				pays_fee: pay,
 			},
 			info,
 		))
