@@ -22,7 +22,7 @@ use fp_evm::{
 };
 use frame_system::RawOrigin;
 use hp_system::EvmHybridVMExtension;
-use pallet_evm::AddressMapping;
+use pallet_evm::{AddressMapping, GasWeightMapping};
 
 pub struct CallHybridVM<T> {
 	_marker: PhantomData<T>,
@@ -39,7 +39,13 @@ where
 
 		match T::call_hybrid_vm(origin.into(), handle.input().iter().cloned().collect(), target_gas)
 		{
-			Ok(ret) => Ok(PrecompileOutput { exit_status: ExitSucceed::Returned, output: ret.0 }),
+			Ok(ret) => {
+				let gas_consume = ret.1;
+				let gas_limit = target_gas.unwrap_or(0);
+				let gas_record = if gas_consume > gas_limit { gas_limit } else { gas_consume };
+				handle.record_cost(gas_record)?;
+				Ok(PrecompileOutput { exit_status: ExitSucceed::Returned, output: ret.0 })
+			},
 			Err(e) => {
 				let err_str: &'static str = e.into();
 

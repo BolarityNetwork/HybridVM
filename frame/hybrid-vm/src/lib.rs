@@ -83,12 +83,6 @@ pub mod pallet {
 
 		#[pallet::constant]
 		type EnableCallWasmVM: Get<bool>;
-
-		#[pallet::constant]
-		type GasLimit: Get<u64>;
-
-		#[pallet::constant]
-		type GasPrice: Get<Option<U256>>;
 	}
 
 	#[pallet::pallet]

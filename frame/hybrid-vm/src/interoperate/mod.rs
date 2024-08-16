@@ -38,8 +38,8 @@ use sp_runtime::{
 
 use serde::{Deserialize, Serialize};
 
-use fp_evm::ExecutionInfoV2;
-use pallet_evm::Runner;
+use fp_evm::{ExecutionInfoV2, FeeCalculator};
+use pallet_evm::{GasWeightMapping, Runner};
 
 use super::*;
 use frame_support::pallet_prelude::*;
@@ -142,6 +142,9 @@ impl<C: Config> InterCall<C> {
 			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
 		}
 
+		let gas_meter = env.ext().gas_meter();
+		let gas_limit =
+			<C as pallet_evm::Config>::GasWeightMapping::weight_to_gas(gas_meter.gas_left());
 		let caller = env.ext().caller();
 		let source = C::AccountIdMapping::into_address(caller.account_id()?.clone());
 
@@ -158,13 +161,14 @@ impl<C: Config> InterCall<C> {
 			},
 		}
 
+		let gas_price = <C as pallet_evm::Config>::FeeCalculator::min_gas_price();
 		let info = <C as pallet_evm::Config>::Runner::call(
 			source,
 			target,
 			input,
 			U256::default(),
-			C::GasLimit::get(),
-			C::GasPrice::get(),
+			gas_limit,
+			Some(gas_price.0),
 			None,
 			Some(pallet_evm::Pallet::<C>::account_basic(&source).0.nonce),
 			Vec::new(),
@@ -177,14 +181,16 @@ impl<C: Config> InterCall<C> {
 
 		let output: ResultBox<Vec<u8>>;
 		match info {
-			Ok(r) => match r {
-				ExecutionInfoV2 { exit_reason: success, value: v1, .. } => {
-					if success.is_succeed() {
-						output = vm_codec::evm_decode(&input0, &v1, true, "");
-					} else {
-						return Err(DispatchError::from("Call EVM failed "));
-					}
-				},
+			Ok(r) => {
+				match r {
+					ExecutionInfoV2 { exit_reason: success, value: v1, .. } => {
+						if success.is_succeed() {
+							output = vm_codec::evm_decode(&input0, &v1, true, "");
+						} else {
+							return Err(DispatchError::from("Call EVM failed "));
+						}
+					},
+				};
 			},
 			Err(e) => {
 				return Err(DispatchError::from(e.error.into()));
