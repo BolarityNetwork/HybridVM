@@ -34,11 +34,11 @@ use crate::{
 };
 use fp_self_contained::CheckedExtrinsic;
 
-use sp_runtime::codec::{Decode, Encode};
-use sp_runtime::traits::{BlakeTwo256, Hash};
-use std::error::Error;
-use std::fs::File;
-use std::io::Read;
+use sp_runtime::{
+	codec::{Decode, Encode},
+	traits::{BlakeTwo256, Hash},
+};
+use std::{error::Error, fs::File, io::Read};
 
 mod eip1559;
 mod eip2930;

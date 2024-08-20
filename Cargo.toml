@@ -76,6 +76,7 @@ fp-self-contained = { git = "https://github.com/paritytech/frontier", branch = "
 fp-storage = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.11.0", default-features = false }
 pallet-evm = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.11.0", default-features = false }
 pallet-evm-precompile-simple = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.11.0", default-features = false }
+precompile-utils = { git = "https://github.com/paritytech/frontier", branch = "polkadot-v1.11.0", default-features = false }
 
 # ink
 ink_env = { git = "https://github.com/paritytech/ink" }
