@@ -119,6 +119,14 @@ pub mod pallet {
 		EvmABIDecodeError,
 		EvmABIError,
 		WasmContractRevert,
+		DisableCallWasmVM,
+		DisableCallEvm,
+		AccountIdDecodeError,
+		WasmEncodeError,
+		WasmDecodeError,
+		EvmEncodeError,
+		EvmDecodeError,
+		ChainExtensionWriteError,
 	}
 
 	#[pallet::hooks]

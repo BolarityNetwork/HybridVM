@@ -82,7 +82,7 @@ impl<T: Config> InterCall<T> {
 		target_gas: Weight,
 	) -> Result<(Vec<u8>, Weight)> {
 		if !T::EnableCallWasmVM::get() {
-			return Err(DispatchError::from("EnableCallWasmVM is false, can't call wasm VM."));
+			return Err(DispatchError::from(Error::<T>::DisableCallWasmVM));
 		}
 
 		let input: Vec<u8>;
@@ -90,14 +90,14 @@ impl<T: Config> InterCall<T> {
 
 		match vm_codec::wasm_encode(&data[32..].iter().cloned().collect()) {
 			Ok(r) => (input, target) = r,
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<T>::WasmEncodeError)),
 		}
 
 		let gas_limit: Weight = target_gas;
 
 		let origin = ensure_signed(origin)?;
 		let target = <T as frame_system::Config>::AccountId::decode(&mut target.as_slice())
-			.map_err(|e| DispatchError::from(str2s(e.to_string())))?;
+			.map_err(|_| DispatchError::from(Error::<T>::AccountIdDecodeError))?;
 
 		let info = pallet_contracts::Pallet::<T>::bare_call(
 			origin,
@@ -123,7 +123,7 @@ impl<T: Config> InterCall<T> {
 						"",
 					);
 				} else {
-					return Err(DispatchError::from("Call wasm contract failed(REVERT)"));
+					return Err(DispatchError::from(Error::<T>::WasmContractRevert));
 				}
 			},
 			Err(e) => return Err(e),
@@ -131,7 +131,7 @@ impl<T: Config> InterCall<T> {
 
 		match output {
 			Ok(r) => return Ok((r, info.gas_consumed)),
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<T>::WasmDecodeError)),
 		}
 	}
 }
@@ -139,7 +139,7 @@ impl<T: Config> InterCall<T> {
 impl<C: Config> InterCall<C> {
 	pub fn call_evm<E: Ext<T = C>>(mut env: Environment<E, InitState>) -> Result<RetVal> {
 		if !C::EnableCallEVM::get() {
-			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
+			return Err(DispatchError::from(Error::<C>::DisableCallEvm));
 		}
 
 		let gas_meter = env.ext().gas_meter();
@@ -156,8 +156,8 @@ impl<C: Config> InterCall<C> {
 
 		match vm_codec::evm_encode(&input0) {
 			Ok(r) => (input, target) = r,
-			Err(e) => {
-				return Err(DispatchError::from(str2s(e.to_string())));
+			Err(_) => {
+				return Err(DispatchError::from(Error::<C>::EvmEncodeError));
 			},
 		}
 
@@ -187,7 +187,7 @@ impl<C: Config> InterCall<C> {
 						if success.is_succeed() {
 							output = vm_codec::evm_decode(&input0, &v1, true, "");
 						} else {
-							return Err(DispatchError::from("Call EVM failed "));
+							return Err(DispatchError::from(Error::<C>::EVMExecuteFailed));
 						}
 					},
 				};
@@ -201,13 +201,13 @@ impl<C: Config> InterCall<C> {
 			Ok(r) => {
 				let output = envbuf
 					.write(&r, false, None)
-					.map_err(|_| DispatchError::from("ChainExtension failed to write result"));
+					.map_err(|_| DispatchError::from(Error::<C>::ChainExtensionWriteError));
 				match output {
 					Ok(_) => return Ok(RetVal::Converging(0)),
 					Err(e) => return Err(e),
 				}
 			},
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<C>::EvmDecodeError)),
 		}
 	}
 }
