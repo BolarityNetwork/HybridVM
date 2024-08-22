@@ -165,6 +165,10 @@ mod erc20 {
 			evm_abi.push(("approve(address,uint256)returns(bool)".to_string(), "approve_abi".to_string(), None));
 			evm_abi.push(("transferFrom(address,address,uint256)returns(bool)".to_string(), "transfer_from_abi".to_string(), None));
 			
+			evm_abi.push(("wasmCallEvm(string,string,uint128)returns(string)".to_string(), "wasmCallEvm".to_string(), None));
+			evm_abi.push(("wasmCallEvmBalance(string,string)returns(uint128)".to_string(), "wasmCallEvmBalance".to_string(), None));
+			evm_abi.push(("wasmCallEvmProxy(string)returns(string)".to_string(), "wasmCallEvmProxy".to_string(), None));
+			
 			evm_abi
         }	
 		
