@@ -348,7 +348,7 @@ impl<T: Config> Pallet<T> {
 						};
 
 						let info = pallet_contracts::Pallet::<T>::bare_call(
-							origin,
+							origin.clone(),
 							t.into(),
 							balance,
 							weight_limit,
@@ -362,8 +362,7 @@ impl<T: Config> Pallet<T> {
 						match info.result {
 							Ok(return_value) => {
 								if !return_value.did_revert() {
-									// because return_value.data = MessageResult<T, E>, so, the
-									// first byte is zhe Ok() Code, be removed
+									frame_system::Pallet::<T>::inc_account_nonce(&origin);
 									let err_data = DispatchErrorWithPostInfo {
 										post_info: PostDispatchInfo {
 											actual_weight: Some(info.gas_consumed),
