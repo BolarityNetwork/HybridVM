@@ -108,8 +108,16 @@ impl<T: Config> Pallet<T> {
 			return Err(err);
 		}
 
-		let input_type: Vec<&str> = abi_fun[index_s1 + 1..index_e1].split(',').collect();
-		let output_type: Vec<&str> = abi_fun[index_s2 + 1..index_e2].split(',').collect();
+		let input_type: Vec<&str> = if index_s1 + 1 < index_e1 {
+			abi_fun[index_s1 + 1..index_e1].split(',').collect()
+		} else {
+			vec![]
+		};
+		let output_type: Vec<&str> = if index_s2 + 1 < index_e2 {
+			abi_fun[index_s2 + 1..index_e2].split(',').collect()
+		} else {
+			vec![]
+		};
 
 		// wasm type: AccountId,bool,Vec<u8>,H256,String,u8,u16,u32,u64,u128,U256,Vec<T>
 		let data_type = "address,bool,bytes,bytes32,string,uint8,uint16,uint32,uint64,uint128,uint256,address[],bool[],bytes32[],uint8[],uint16[],uint32[],uint64[],uint128[],uint256[]";
@@ -340,7 +348,7 @@ impl<T: Config> Pallet<T> {
 						};
 
 						let info = pallet_contracts::Pallet::<T>::bare_call(
-							origin,
+							origin.clone(),
 							t.into(),
 							balance,
 							weight_limit,
@@ -354,8 +362,7 @@ impl<T: Config> Pallet<T> {
 						match info.result {
 							Ok(return_value) => {
 								if !return_value.did_revert() {
-									// because return_value.data = MessageResult<T, E>, so, the
-									// first byte is zhe Ok() Code, be removed
+									frame_system::Pallet::<T>::inc_account_nonce(&origin);
 									let err_data = DispatchErrorWithPostInfo {
 										post_info: PostDispatchInfo {
 											actual_weight: Some(info.gas_consumed),
