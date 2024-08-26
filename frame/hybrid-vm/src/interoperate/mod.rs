@@ -25,20 +25,21 @@ use alloc::string::{String, ToString};
 
 use codec::{Decode, Encode};
 use core::fmt;
-use sp_std::vec;
-use sp_std::vec::Vec;
-use sp_std::{prelude::*, str};
+use sp_std::{prelude::*, str, vec, vec::Vec};
 
-use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
-use pallet_contracts::{CollectEvents, DebugInfo, Determinism};
-use sp_runtime::app_crypto::sp_core::{H160, U256};
-use sp_runtime::DispatchError;
+use pallet_contracts::{
+	chain_extension::{Environment, Ext, InitState, RetVal},
+	CollectEvents, DebugInfo, Determinism,
+};
+use sp_runtime::{
+	app_crypto::sp_core::{H160, U256},
+	DispatchError,
+};
 
 use serde::{Deserialize, Serialize};
 
-use fp_evm::ExecutionInfoV2;
-use frame_support::sp_runtime::AccountId32;
-use pallet_evm::Runner;
+use fp_evm::{ExecutionInfoV2, FeeCalculator};
+use pallet_evm::{GasWeightMapping, Runner};
 
 use super::*;
 use frame_support::pallet_prelude::*;
@@ -81,21 +82,22 @@ impl<T: Config> InterCall<T> {
 		target_gas: Weight,
 	) -> Result<(Vec<u8>, Weight)> {
 		if !T::EnableCallWasmVM::get() {
-			return Err(DispatchError::from("EnableCallWasmVM is false, can't call wasm VM."));
+			return Err(DispatchError::from(Error::<T>::DisableCallWasmVM));
 		}
 
 		let input: Vec<u8>;
-		let target: AccountId32;
+		let target: Vec<u8>;
 
 		match vm_codec::wasm_encode(&data[32..].iter().cloned().collect()) {
 			Ok(r) => (input, target) = r,
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<T>::WasmEncodeError)),
 		}
 
 		let gas_limit: Weight = target_gas;
 
 		let origin = ensure_signed(origin)?;
-		let target = T::AccountId32Mapping::id32_to_id(target);
+		let target = <T as frame_system::Config>::AccountId::decode(&mut target.as_slice())
+			.map_err(|_| DispatchError::from(Error::<T>::AccountIdDecodeError))?;
 
 		let info = pallet_contracts::Pallet::<T>::bare_call(
 			origin,
@@ -112,7 +114,8 @@ impl<T: Config> InterCall<T> {
 		match info.result {
 			Ok(return_value) => {
 				if !return_value.did_revert() {
-					// because return_value.data = MessageResult<T, E>, so, the first byte is zhe Ok() Code, be removed
+					// because return_value.data = MessageResult<T, E>, so, the first byte is zhe
+					// Ok() Code, be removed
 					output = vm_codec::wasm_decode(
 						&data[32..].iter().cloned().collect(),
 						&return_value.data[1..].iter().cloned().collect(),
@@ -120,7 +123,7 @@ impl<T: Config> InterCall<T> {
 						"",
 					);
 				} else {
-					return Err(DispatchError::from("Call wasm contract failed(REVERT)"));
+					return Err(DispatchError::from(Error::<T>::WasmContractRevert));
 				}
 			},
 			Err(e) => return Err(e),
@@ -128,7 +131,7 @@ impl<T: Config> InterCall<T> {
 
 		match output {
 			Ok(r) => return Ok((r, info.gas_consumed)),
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<T>::WasmDecodeError)),
 		}
 	}
 }
@@ -136,9 +139,12 @@ impl<T: Config> InterCall<T> {
 impl<C: Config> InterCall<C> {
 	pub fn call_evm<E: Ext<T = C>>(mut env: Environment<E, InitState>) -> Result<RetVal> {
 		if !C::EnableCallEVM::get() {
-			return Err(DispatchError::from("EnableCallEVM is false, can't call evm."));
+			return Err(DispatchError::from(Error::<C>::DisableCallEvm));
 		}
 
+		let gas_meter = env.ext().gas_meter();
+		let gas_limit =
+			<C as pallet_evm::Config>::GasWeightMapping::weight_to_gas(gas_meter.gas_left());
 		let caller = env.ext().caller();
 		let source = C::AccountIdMapping::into_address(caller.account_id()?.clone());
 
@@ -150,18 +156,19 @@ impl<C: Config> InterCall<C> {
 
 		match vm_codec::evm_encode(&input0) {
 			Ok(r) => (input, target) = r,
-			Err(e) => {
-				return Err(DispatchError::from(str2s(e.to_string())));
+			Err(_) => {
+				return Err(DispatchError::from(Error::<C>::EvmEncodeError));
 			},
 		}
 
+		let gas_price = <C as pallet_evm::Config>::FeeCalculator::min_gas_price();
 		let info = <C as pallet_evm::Config>::Runner::call(
 			source,
 			target,
 			input,
 			U256::default(),
-			C::GasLimit::get(),
-			C::GasPrice::get(),
+			gas_limit,
+			Some(gas_price.0),
 			None,
 			Some(pallet_evm::Pallet::<C>::account_basic(&source).0.nonce),
 			Vec::new(),
@@ -174,14 +181,16 @@ impl<C: Config> InterCall<C> {
 
 		let output: ResultBox<Vec<u8>>;
 		match info {
-			Ok(r) => match r {
-				ExecutionInfoV2 { exit_reason: success, value: v1, .. } => {
-					if success.is_succeed() {
-						output = vm_codec::evm_decode(&input0, &v1, true, "");
-					} else {
-						return Err(DispatchError::from("Call EVM failed "));
-					}
-				},
+			Ok(r) => {
+				match r {
+					ExecutionInfoV2 { exit_reason: success, value: v1, .. } => {
+						if success.is_succeed() {
+							output = vm_codec::evm_decode(&input0, &v1, true, "");
+						} else {
+							return Err(DispatchError::from(Error::<C>::EVMExecuteFailed));
+						}
+					},
+				};
 			},
 			Err(e) => {
 				return Err(DispatchError::from(e.error.into()));
@@ -192,13 +201,13 @@ impl<C: Config> InterCall<C> {
 			Ok(r) => {
 				let output = envbuf
 					.write(&r, false, None)
-					.map_err(|_| DispatchError::from("ChainExtension failed to write result"));
+					.map_err(|_| DispatchError::from(Error::<C>::ChainExtensionWriteError));
 				match output {
 					Ok(_) => return Ok(RetVal::Converging(0)),
 					Err(e) => return Err(e),
 				}
 			},
-			Err(e) => return Err(DispatchError::from(str2s(e.to_string()))),
+			Err(_) => return Err(DispatchError::from(Error::<C>::EvmDecodeError)),
 		}
 	}
 }
@@ -234,13 +243,11 @@ impl fmt::Display for CustomError {
 pub mod vm_codec {
 	use super::*;
 
-	use codec::Compact;
-	use codec::Encode;
+	use codec::{Compact, Encode};
 	use core::mem::size_of;
 	use sha3::{Digest, Keccak256};
-	use sp_runtime::{traits::BlakeTwo256, AccountId32};
-	use sp_std::convert::TryInto;
-	use sp_std::str::FromStr;
+	use sp_runtime::traits::BlakeTwo256;
+	use sp_std::{convert::TryInto, str::FromStr};
 
 	type Result<T> = sp_std::result::Result<T, CustomError>;
 
@@ -289,10 +296,10 @@ pub mod vm_codec {
 		let mut data_ex: Vec<u8> = Vec::new();
 		let mut i: usize = 0;
 
-		// 256 bit for per fix parameter,  dyn parameter occupy 256bit offset value, and value add after all fix paramter
-		// dyn parameter in offset one 256bit length value, and after real value
-		// uint int using big endian, and patch 0 in high bit.  else for address byte patch 0 in low bit.
-		// array's inputValue: len, v1,v2, ..., vlen.
+		// 256 bit for per fix parameter,  dyn parameter occupy 256bit offset value, and value add
+		// after all fix paramter dyn parameter in offset one 256bit length value, and after real
+		// value uint int using big endian, and patch 0 in high bit.  else for address byte patch
+		// 0 in low bit. array's inputValue: len, v1,v2, ..., vlen.
 		for p in call_vm.InputType {
 			let value = call_vm.InputValue.get(i).ok_or(CustomError::new("Data number error"))?;
 			let mut value_data: Vec<u8> = Vec::new();
@@ -617,21 +624,18 @@ pub mod vm_codec {
 		Ok(String::encode(&return_json))
 	}
 
-	pub fn wasm_encode(input: &Vec<u8>) -> Result<(Vec<u8>, AccountId32)> {
+	pub fn wasm_encode(input: &Vec<u8>) -> Result<(Vec<u8>, Vec<u8>)> {
 		let call_vm: CallVM = t!(serde_json::from_slice(input.as_slice()));
 		let account = call_vm.Account;
-		let mut bytes = [0u8; 32];
-		let target = t!(hex::decode_to_slice(&account[2..], &mut bytes)
-			.map_err(|_| "invalid hex address.")
-			.map(|_| AccountId32::from(bytes)));
+		let target = t!(hex::decode(&account[2..]).map_err(|_| "invalid hex address."));
 		let selector = &<BlakeTwo256 as sp_core::Hasher>::hash(call_vm.Fun.as_bytes())[0..4];
 		let mut data: Vec<u8> = Vec::new();
 		let mut i: usize = 0;
 
-		// scale codec LE: fixlength per fixed-width parameter,  dyn parameter: prefixed with a compact encoding of the number of items
-		// compact integer with compact encoding: 00--one byte  01--two bytes  10--four bytes  11--big number
-		//    The upper six bits are the number of bytes following
-		// list inputValue: Vector u8 u8 u8    "3", "12","34","56"
+		// scale codec LE: fixlength per fixed-width parameter,  dyn parameter: prefixed with a
+		// compact encoding of the number of items compact integer with compact encoding: 00--one
+		// byte  01--two bytes  10--four bytes  11--big number    The upper six bits are the
+		// number of bytes following list inputValue: Vector u8 u8 u8    "3", "12","34","56"
 		for p in call_vm.InputType {
 			let value = call_vm.InputValue.get(i).ok_or(CustomError::new("Data number error"))?;
 			let mut value_data: Vec<u8> = Vec::new();
@@ -649,7 +653,9 @@ pub mod vm_codec {
 				//"f32" => value_data.append(&mut to_scale::<f32>(&value)),
 				//"f64" => value_data.append(&mut to_scale::<f64>(&value)),
 				"bool" => value_data.append(&mut to_scale::<u8>(&value)), // false: 00 true: 01
-				"enum" => value_data.append(&mut to_scale::<u8>(&value)), //Option  Result are enum: None 00  Some 01   Ok 00  Err 01
+				"enum" => value_data.append(&mut to_scale::<u8>(&value)), /* Option  Result are
+				                                                            * enum: None 00  Some
+				                                                            * 01   Ok 00  Err 01 */
 				//Option<bool> : None 00  Some true 01  Some false 02
 				"char" => {
 					let c = value.chars().next().ok_or(CustomError::new("Char value error"))?;
@@ -687,9 +693,11 @@ pub mod vm_codec {
 		ret
 	}
 
-	//number 0 Vec<string> , when it has Vector or Enum type, then the number 0+1 Vec<string> it set number x Vec<string>, Vec has detail info and Enum has index nmber x of the second Vec<string> means 00:vec   01:vec
-	//example Vec   [ ...  "10", ...]   10th ["u8","string"...]  "0" means none
-	//example Enum  [ ...  "13", ...]   13th ["16","17","18"]    16th ["u8","string"] "0" means none  index is the index position's type
+	//number 0 Vec<string> , when it has Vector or Enum type, then the number 0+1 Vec<string> it
+	// set number x Vec<string>, Vec has detail info and Enum has index nmber x of the second
+	// Vec<string> means 00:vec   01:vec example Vec   [ ...  "10", ...]   10th ["u8","string"...]
+	// "0" means none example Enum  [ ...  "13", ...]   13th ["16","17","18"]    16th
+	// ["u8","string"] "0" means none  index is the index position's type
 	pub fn wasm_decode(
 		input: &Vec<u8>,
 		output: &Vec<u8>,
@@ -798,7 +806,8 @@ pub mod vm_codec {
 						}
 					}
 				},
-				//Option  Result are enum: None 00 Some 01, Ok00 Err01; Option<bool> : None 00  Some true 01  Some false 02
+				//Option  Result are enum: None 00 Some 01, Ok00 Err01; Option<bool> : None 00
+				// Some true 01  Some false 02
 				"enum" => {
 					let a = output[*offset] as usize;
 					call_return.ReturnValue.push(to_string_value::<u8>(&output, offset));
@@ -876,7 +885,8 @@ pub mod vm_codec {
 				let val_bytes = [a, output[*offset + 1], output[*offset + 2], output[*offset + 3]];
 				val = u32::from_le_bytes(val_bytes) as usize;
 			},
-			_ => return Err(CustomError::new("Not support.")), //ob11 not support, which up six is the bignumber length.
+			_ => return Err(CustomError::new("Not support.")), /* ob11 not support, which up six
+			                                                    * is the bignumber length. */
 		}
 
 		b = b * 2;

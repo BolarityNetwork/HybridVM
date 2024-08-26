@@ -30,12 +30,12 @@ use frame_support::{
 	weights::Weight,
 	ConsensusEngineId, PalletId,
 };
-use sp_core::crypto::UncheckedFrom;
-use sp_core::{hashing::keccak_256, ConstBool, H160, H256, U256};
+
+use sp_core::{crypto::UncheckedFrom, hashing::keccak_256, ConstBool, H160, H256, U256};
 
 use sp_runtime::{
 	traits::{BlakeTwo256, Convert, Dispatchable, IdentityLookup},
-	AccountId32, BuildStorage, Perbill,
+	AccountId32, BuildStorage, DispatchError, Perbill,
 };
 // Frontier
 use pallet_evm::{AddressMapping, BalanceOf, EnsureAddressTruncated, FeeCalculator};
@@ -45,7 +45,7 @@ use pallet_contracts::chain_extension::{Environment, Ext, InitState, RetVal};
 
 // HybridVM
 use byte_slice_cast::AsByteSlice;
-use hp_system::{AccountId32Mapping, AccountIdMapping, U256BalanceMapping};
+use hp_system::{AccountIdMapping, U256BalanceMapping};
 
 use super::*;
 use crate::IntermediateStateRoot;
@@ -53,6 +53,8 @@ use crate::IntermediateStateRoot;
 pub type SignedExtra = (frame_system::CheckSpecVersion<Test>,);
 
 type Balance = u128;
+
+type AccountId = AccountId32;
 
 frame_support::construct_runtime! {
 	pub enum Test {
@@ -85,7 +87,7 @@ impl frame_system::Config for Test {
 	type Nonce = u64;
 	type Hash = H256;
 	type Hashing = BlakeTwo256;
-	type AccountId = AccountId32;
+	type AccountId = AccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = frame_system::mocking::MockBlock<Self>;
 	type BlockHashCount = BlockHashCount;
@@ -150,21 +152,21 @@ parameter_types! {
 }
 
 pub struct HashedAddressMapping;
-impl AddressMapping<AccountId32> for HashedAddressMapping {
-	fn into_account_id(address: H160) -> AccountId32 {
+impl AddressMapping<AccountId> for HashedAddressMapping {
+	fn into_account_id(address: H160) -> AccountId {
 		let mut data = [0u8; 32];
 		data[0..20].copy_from_slice(&address[..]);
-		AccountId32::from(Into::<[u8; 32]>::into(data))
+		AccountId::from(Into::<[u8; 32]>::into(data))
 	}
 }
 
 pub struct CompactAddressMapping;
 
-impl AddressMapping<AccountId32> for CompactAddressMapping {
-	fn into_account_id(address: H160) -> AccountId32 {
+impl AddressMapping<AccountId> for CompactAddressMapping {
+	fn into_account_id(address: H160) -> AccountId {
 		let mut data = [0u8; 32];
 		data[0..20].copy_from_slice(&address[..]);
-		AccountId32::from(data)
+		AccountId::from(data)
 	}
 }
 
@@ -209,7 +211,8 @@ impl pallet_contracts::chain_extension::ChainExtension<Test> for HybridVMChainEx
 	fn call<E>(&mut self, env: Environment<E, InitState>) -> Result<RetVal, DispatchError>
 	where
 		E: Ext<T = Test>,
-		<E::T as SysConfig>::AccountId: UncheckedFrom<<E::T as SysConfig>::Hash> + AsRef<[u8]>,
+		<E::T as frame_system::Config>::AccountId:
+			UncheckedFrom<<E::T as frame_system::Config>::Hash> + AsRef<[u8]>,
 	{
 		let func_id = env.func_id();
 		match func_id {
@@ -270,10 +273,10 @@ parameter_types! {
 }
 
 pub struct EnsureAccount<T, A>(sp_std::marker::PhantomData<(T, A)>);
-impl<T: Config, A: sp_core::Get<Option<AccountId32>>>
+impl<T: Config, A: sp_core::Get<Option<AccountId>>>
 	EnsureOrigin<<T as frame_system::Config>::RuntimeOrigin> for EnsureAccount<T, A>
 where
-	<T as frame_system::Config>::AccountId: From<AccountId32>,
+	<T as frame_system::Config>::AccountId: From<AccountId>,
 {
 	type Success = T::AccountId;
 
@@ -332,17 +335,9 @@ impl pallet_contracts::Config for Test {
 	type Xcm = ();
 }
 
-pub struct GasPrice;
-impl Get<Option<U256>> for GasPrice {
-	fn get() -> Option<U256> {
-		Some(U256::from(100_000_000_000u64))
-	}
-}
-
 parameter_types! {
 	pub const EnableCallEVM: bool = true;
 	pub const EnableCallWasmVM: bool = true;
-	pub const GasLimit: u64 = 10_000_000u64;
 }
 
 impl U256BalanceMapping for Test {
@@ -361,26 +356,13 @@ impl AccountIdMapping<Test> for Test {
 	}
 }
 
-impl AccountId32Mapping<Test> for Test {
-	fn id32_to_id(id32: AccountId32) -> <Test as frame_system::Config>::AccountId {
-		id32.into()
-	}
-
-	fn id_to_id32(account_id: <Test as frame_system::Config>::AccountId) -> AccountId32 {
-		account_id.into()
-	}
-}
-
 impl pallet_hybrid_vm::Config for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type Currency = Balances;
 	type U256BalanceMapping = Self;
 	type AccountIdMapping = Self;
-	type AccountId32Mapping = Self;
 	type EnableCallEVM = EnableCallEVM;
 	type EnableCallWasmVM = EnableCallWasmVM;
-	type GasLimit = GasLimit;
-	type GasPrice = GasPrice;
 }
 
 parameter_types! {
@@ -452,7 +434,7 @@ impl fp_self_contained::SelfContainedCall for RuntimeCall {
 
 pub struct AccountInfo {
 	pub address: H160,
-	pub account_id: AccountId32,
+	pub account_id: AccountId,
 	pub private_key: H256,
 }
 
@@ -465,11 +447,7 @@ fn address_build(seed: u8) -> AccountInfo {
 	let mut data = [0u8; 32];
 	data[0..20].copy_from_slice(&address[..]);
 
-	AccountInfo {
-		private_key,
-		account_id: AccountId32::from(Into::<[u8; 32]>::into(data)),
-		address,
-	}
+	AccountInfo { private_key, account_id: AccountId::from(Into::<[u8; 32]>::into(data)), address }
 }
 
 // This function basically just builds a genesis storage key/value store according to
