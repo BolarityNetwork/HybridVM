@@ -167,7 +167,7 @@ impl<T: Config> Pallet<T> {
 			}
 
 			b!(data_type, winput, reader, err_data, "bool", bool "bytes32", H256 "uint8", u8 "uint16", u16 "uint32", u32 "uint64", u64 "uint128", u128 "uint256", U256);
-			b!(data_type, winput, reader, err_data, "bool[]", bool "bytes32[]", H256 "uint8[]", u8 "uint16[]", u16 "uint32[]", u32 "uint64[]", u64 "uint128[]", u128 "uint256[]", U256);
+			b!(data_type, winput, reader, err_data, "bool[]", Vec<bool> "bytes32[]", Vec<H256> "uint8[]", Vec<u8> "uint16[]", Vec<u16> "uint32[]", Vec<u32> "uint64[]", Vec<u64> "uint128[]", Vec<u128> "uint256[]", Vec<U256>);
 
 			return Err(err_data);
 		}
@@ -217,7 +217,7 @@ impl<T: Config> Pallet<T> {
 			}
 
 			c!(data_type, writer, woutput, "bool", bool "bytes32", H256 "uint8", u8 "uint16", u16 "uint32", u32 "uint64", u64 "uint128", u128 "uint256", U256);
-			c!(data_type, writer, woutput, "bool[]", bool "bytes32[]", H256 "uint8[]", u8 "uint16[]", u16 "uint32[]", u32 "uint64[]", u64 "uint128[]", u128 "uint256[]", U256);
+			c!(data_type, writer, woutput, "bool[]", Vec<bool> "bytes32[]", Vec<H256> "uint8[]", Vec<u8> "uint16[]", Vec<u16> "uint32[]", Vec<u32> "uint64[]", Vec<u64> "uint128[]", Vec<u128> "uint256[]", Vec<U256>);
 
 			return Err(6);
 		}
